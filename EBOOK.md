@@ -114,17 +114,17 @@ app.MapGet("/orders/{id}", (int id) => orderService.GetOrder(id));
 #### Ciclo de Vida e Suporte
 
 **Suporte de Versões** (crítico para planejamento):
-- **.NET Framework 4.5-4.8**: Suporte estendido até **2028-2029**, mas **SEM novas features desde 2019**
-- **.NET 10 (LTS)**: Suporte até **novembro de 2028** (3 anos de patches de segurança/correções)
-- **.NET 11 (STS - Nov 2026)**: Suporte até **maio de 2028** (18 meses - NÃO recomendado para produção)
-- **.NET 12 (LTS - Nov 2027)**: Próxima versão de longo prazo
+- **.NET Framework 4.5-4.8**: Em suporte estendido seguindo o ciclo de vida do Windows, mas **SEM novas features desde 2019**
+- **.NET 10 (LTS - Nov 2025)**: Suporte até **novembro de 2028** (3 anos de patches de segurança e correções)
+- **.NET 11 (STS - Nov 2026)**: Suporte até **maio de 2028** (18 meses - NÃO recomendado para produção de longo prazo)
+- **.NET 12 (LTS - Nov 2027)**: Próxima versão de longo prazo prevista
 
-**Recomendação**: Atualize para .NET 10 (LTS) agora para garantir suporte até 2028. Evite .NET 11 (STS) se precisar de estabilidade.
+**Recomendação**: Atualize para .NET 10 (LTS) para garantir suporte até 2028. Evite versões STS se precisar de estabilidade e suporte de longo prazo.
 
-**Depreciações Futuras** (planejamento 2026-2030):
-- **System.Text.Json** substituirá completamente Newtonsoft.Json como padrão (já é recomendado)
-- **Entity Framework 6.x** (legado) será descontinuado em favor do EF Core
-- **ASP.NET Core MVC tradicional** será gradualmente substituído por Minimal APIs + Blazor
+**Tendências e Recomendações** (planejamento 2026-2030):
+- **System.Text.Json** é recomendado como padrão (melhor performance e nativamente suportado)
+- **Entity Framework Core** é a recomendação oficial da Microsoft para novos projetos (EF 6.x em modo de manutenção)
+- **Minimal APIs + Blazor** são as tecnologias recomendadas pela Microsoft para novos projetos web (MVC tradicional continua suportado)
 
 ### Novas Features: Robustez, Escalabilidade e Confiabilidade
 
