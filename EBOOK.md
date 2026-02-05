@@ -98,6 +98,7 @@ public interface IOrderService {
 }
 
 // ✅ .NET 10 - gRPC (mais rápido, type-safe)
+// Definição em arquivo .proto
 service OrderService {
     rpc GetOrder (OrderRequest) returns (OrderResponse);
 }
@@ -230,7 +231,7 @@ Proteção contra ameaças futuras (quantum computing):
 // Algoritmos resistentes a computação quântica (ML-KEM, ML-DSA)
 // Disponíveis em .NET 10 via System.Security.Cryptography
 var kyber = MlKem.Create(MlKemParameterSpec.ML_KEM_768);
-// Criptografia que permanecerá segura até 2035+
+// Baseado em projeções atuais, deve permanecer seguro contra ataques quânticos
 ```
 
 #### 4. Produtividade e Developer Experience
