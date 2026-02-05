@@ -265,16 +265,764 @@ Levar você de "funciona no Windows Server 2008" para "deploy em Azure/AWS/K8s c
 
 ## Capítulo 1: Evolução do .NET – Timeline de 4.5 até 10
 
-.NET 4.5 → .NET Framework 4.8 (fim da linha, 2019-2022)  
-→ .NET Core 1.0 (2016) → .NET 5 (2020: unificação) → .NET 10 (2025 LTS)
+A jornada do .NET é uma história de transformação contínua, desde uma plataforma Windows-only até um ecossistema moderno, cross-platform e de alto desempenho. Este capítulo detalha cada marco importante, suas vantagens e as alternativas para recursos descontinuados.
 
 *Diagrama clássico: .NET Framework (azul, Windows-only) vs .NET Core (verde, cross) vs Xamarin (roxo, mobile) → tudo unificado no .NET moderno.*
 
-### Principais marcos:
-- **.NET 5/6 (2020-2021)**: Unificação + MAUI preview
-- **.NET 8 (2023 LTS)**: Native AOT maduro, performance recorde
-- **.NET 9 (2024)**: AI tooling inicial
-- **.NET 10 (Nov 2025 LTS)**: Blazor avançado, passkeys, runtime JIT melhorado (code layout otimizado), SDK tools novos.
+---
+
+### .NET Framework 4.5 (Agosto 2012)
+**C# 5.0 | Windows-only | Plataforma estabelecida**
+
+#### Marcos Principais
+- **Async/Await**: Introdução revolucionária do modelo de programação assíncrona
+- **Entity Framework 5**: ORM maduro com suporte a enums, funções de tabela e performance melhorada
+- **ASP.NET MVC 4**: Model-View-Controller com suporte a APIs Web e mobile
+- **Windows Runtime (WinRT)**: Suporte para apps Windows 8
+- **Melhorias no GC**: Garbage Collection em background para servidores
+
+#### Vantagens na Época
+- Modelo async/await simplificou drasticamente código assíncrono
+- Compatibilidade com Windows Server 2008 R2+
+- Amadurecimento do ecossistema ASP.NET
+- Grande biblioteca de pacotes NuGet disponíveis
+
+#### Limitações e Depreciações
+- **Windows-only**: Não roda em Linux/macOS (substituído por .NET Core/5+)
+- **ASP.NET clássico**: WebForms e MVC antigo (migre para ASP.NET Core + Razor Pages/Blazor)
+- **System.Web**: Acoplamento forte com IIS (use ASP.NET Core com Kestrel cross-platform)
+
+---
+
+### .NET Framework 4.6-4.7.2 (2015-2018)
+**C# 6.0-7.3 | Refinamentos e melhorias incrementais**
+
+#### .NET Framework 4.6 (Julho 2015)
+**Marcos Principais**:
+- **RyuJIT**: Novo compilador JIT 64-bit (~30% mais rápido)
+- **HTTP/2**: Suporte inicial para System.Net.Http
+- **WPF melhorias**: High DPI e touch improvements
+- **Cryptography**: Suporte para ECDSA e certificados X509
+
+**Vantagens**:
+- Performance significativa em compilação JIT
+- Melhor suporte para aplicações modernas Windows
+- Compatibilidade com Windows 7 SP1+
+
+#### .NET Framework 4.7 (Abril 2017)
+**Marcos Principais**:
+- **TLS 1.2**: Suporte padrão para segurança moderna
+- **.NET Standard 2.0**: Compatibilidade com .NET Core
+- **ValueTuple**: Tuples eficientes sem alocação
+
+**Vantagens**:
+- Segurança aprimorada com TLS moderno
+- Ponte para .NET Core via .NET Standard
+- Melhor performance com value types
+
+#### .NET Framework 4.7.2 (Abril 2018)
+**Marcos Principais**:
+- **Span<T> e Memory<T>**: APIs para manipulação de memória de alta performance
+- **SQL Always Encrypted**: Criptografia de dados em repouso
+- **Touch e stylus**: Melhorias para WPF
+
+**Vantagens**:
+- Zero-copy memory operations
+- Segurança de dados aprimorada
+- Última versão com features significativas
+
+---
+
+### .NET Framework 4.8 (Abril 2019) – Fim da Linha
+**C# 7.3 | Última versão do .NET Framework**
+
+#### Marcos Principais
+- **JIT improvements**: Otimizações adicionais de performance
+- **High DPI**: Suporte completo para aplicações modernas
+- **Cryptography**: APIs BCL adicionais
+- **Última versão feature**: Microsoft anuncia que 4.8 é a última versão major
+
+#### Vantagens
+- Versão mais estável e madura do .NET Framework
+- Suporte de longo prazo garantido (vinculado ao Windows)
+- Compatibilidade máxima com código legado
+
+#### Status Atual (2026)
+- **Em suporte de manutenção**: Apenas correções de segurança críticas
+- **Sem novas features desde 2019**: Nenhuma inovação planejada
+- **Windows-only permanente**: Nunca será cross-platform
+- **Recomendação Microsoft**: Migre para .NET moderno (5+)
+
+#### Depreciações Importantes
+| Tecnologia Descontinuada | Motivo | Alternativa Moderna |
+|--------------------------|--------|---------------------|
+| **WCF (Windows Communication Foundation)** | Complexidade, Windows-only, performance | **gRPC** (type-safe, 5-10x mais rápido), **REST APIs** (HTTP/JSON simples) |
+| **WebForms** | Estateful, não escalável, acoplamento forte | **Blazor Server/WASM** (componentes reutilizáveis), **Razor Pages** |
+| **Remoting** | Inseguro, binário proprietário | **gRPC**, **ASP.NET Core APIs** |
+| **AppDomains** | Isolamento pesado, não cross-platform | **AssemblyLoadContext**, processos separados, containers |
+| **BinaryFormatter** | Vulnerabilidades de segurança críticas | **System.Text.Json**, **Protobuf**, **MessagePack** |
+| **Code Access Security (CAS)** | Modelo de segurança obsoleto | **Containers**, **sandboxing OS-level** |
+
+---
+
+### .NET Core 1.0-1.1 (Junho 2016 - Março 2017)
+**C# 6.0-7.0 | Renascimento cross-platform**
+
+#### Marcos Principais
+- **Cross-platform**: Primeira versão que roda em Windows, Linux e macOS
+- **Open Source**: Código 100% aberto no GitHub
+- **ASP.NET Core 1.0**: Reescrita completa, Kestrel web server
+- **Modularização**: NuGet packages em vez de monólito
+- **.NET Standard**: Especificação para compatibilidade entre .NET Framework e Core
+
+#### Vantagens
+- Liberdade de infraestrutura (não mais preso ao Windows)
+- Performance 10x melhor que ASP.NET clássico em benchmarks
+- Comunidade open-source ativa
+- Menor superfície de ataque (menos APIs legacy)
+
+#### Limitações Iniciais
+- Ecosistema ainda imaturo
+- Muitas APIs do .NET Framework não disponíveis
+- Falta de ferramentas (tooling ainda em desenvolvimento)
+
+---
+
+### .NET Core 2.0-2.2 (Agosto 2017 - Dezembro 2018)
+**C# 7.1-7.3 | Amadurecimento**
+
+#### .NET Core 2.0 (Agosto 2017)
+**Marcos Principais**:
+- **.NET Standard 2.0**: +20.000 APIs do .NET Framework compatíveis
+- **Razor Pages**: Alternativa simplificada a MVC
+- **Performance**: 2-3x mais rápido que v1.x
+- **Startup time**: Redução de 50% no tempo de inicialização
+
+**Vantagens**:
+- Migração facilitada do .NET Framework
+- Produtividade aumentada com Razor Pages
+- Viabilidade para produção em larga escala
+
+#### .NET Core 2.1 (Maio 2018) – Primeira LTS
+**Marcos Principais**:
+- **Primeira versão LTS**: Suporte de 3 anos (até 2021)
+- **Span<T> e Memory<T>**: Manipulação de memória zero-copy
+- **HttpClientFactory**: Gerenciamento adequado de conexões HTTP
+- **Performance**: 30% mais rápido em APIs Web
+
+**Vantagens**:
+- Suporte de longo prazo para produção
+- Performance competitiva com frameworks não-.NET (Node.js, Go)
+- Ferramentas de diagnóstico melhoradas
+
+#### .NET Core 2.2 (Dezembro 2018)
+**Marcos Principais**:
+- **HTTP/2 no Kestrel**: Suporte nativo para HTTP/2
+- **Endpoint Routing**: Roteamento mais flexível
+- **HealthChecks**: Monitoramento de saúde nativo
+
+**Nota**: Versão de curto prazo (EOL em dezembro 2019)
+
+---
+
+### .NET Core 3.0-3.1 (Setembro 2019 - Dezembro 2019)
+**C# 8.0 | Desktop e IoT**
+
+#### .NET Core 3.0 (Setembro 2019)
+**Marcos Principais**:
+- **Desktop no Core**: WPF e WinForms migrados para cross-platform runtime
+- **C# 8.0**: Nullable reference types, async streams, ranges
+- **Blazor Server**: UI interativa com SignalR
+- **Worker Services**: Template para serviços em background
+- **gRPC**: Suporte nativo e otimizado
+
+**Vantagens**:
+- Aplicações desktop com performance moderna
+- Blazor permite C# no frontend (sem JavaScript obrigatório)
+- Arquitetura de microservices facilitada com gRPC
+
+#### .NET Core 3.1 (Dezembro 2019) – LTS
+**Marcos Principais**:
+- **Versão LTS**: Suporte até dezembro de 2022
+- **Blazor refinado**: Melhorias de estabilidade
+- **Performance**: Otimizações incrementais
+- **Windows ARM64**: Suporte nativo
+
+**Vantagens**:
+- Base sólida para migração de .NET Framework
+- Ecossistema maduro e ferramentas estáveis
+- Última versão antes da unificação (.NET 5)
+
+---
+
+### .NET 5 (Novembro 2020) – A Grande Unificação
+**C# 9.0 | Uma plataforma para governar todas**
+
+#### Marcos Principais
+- **Unificação**: .NET Framework + .NET Core + Xamarin → .NET único
+- **Numeração**: Pula para 5 para evitar confusão com .NET Framework 4.x
+- **C# 9.0**: Records, init-only properties, top-level statements
+- **Single-file apps**: Empacotamento de app inteiro em um executável
+- **ARM64**: Suporte completo e otimizado
+- **JSON serialization**: System.Text.Json 5x mais rápido
+
+#### Vantagens
+- **Um SDK para tudo**: Web, desktop, mobile, cloud, IoT, AI
+- **Performance**: 30-40% mais rápido que .NET Core 3.1
+- **Produtividade**: Records e pattern matching reduzem boilerplate
+- **Mobile ready**: Caminho claro para Xamarin → MAUI
+
+#### Transição Importante
+- Xamarin integrado (preview de MAUI)
+- Mono runtime para mobile
+- CoreCLR para desktop/server
+
+---
+
+### .NET 6 (Novembro 2021) – LTS com MAUI
+**C# 10.0 | Cross-platform completo**
+
+#### Marcos Principais
+- **Versão LTS**: Suporte até novembro de 2024
+- **.NET MAUI GA**: Multi-platform App UI para Android, iOS, Windows, macOS
+- **Minimal APIs**: APIs Web com ~70% menos código
+- **Hot Reload**: Edição de código sem rebuild (produtividade +60%)
+- **C# 10**: Global usings, file-scoped namespaces, record structs
+- **Performance**: Mais 25% de ganho sobre .NET 5
+
+#### Vantagens
+- **Write Once, Run Anywhere**: Código único para desktop + mobile + web
+- **Developer Experience**: Hot Reload revoluciona desenvolvimento
+- **Minimal APIs**: APIs REST em 5-10 linhas de código
+- **Production Ready**: LTS garante estabilidade
+
+#### Exemplo Minimal API
+```csharp
+var app = WebApplication.Create();
+app.MapGet("/", () => "Hello .NET 6!");
+app.Run();
+```
+
+---
+
+### .NET 7 (Novembro 2022) – Inovação e Performance
+**C# 11.0 | Avanços incrementais**
+
+#### Marcos Principais
+- **Performance**: 15-20% mais rápido que .NET 6 em cenários típicos
+- **C# 11**: Raw string literals, required members, list patterns
+- **Observability**: OpenTelemetry nativo e melhorado
+- **MAUI**: Service worker support, desktop enhancements
+- **Containers**: Imagens menores (~40% redução)
+- **Regular expressions**: Source generators para regex
+
+#### Vantagens
+- **Regex performance**: 10-50x mais rápido com source generators
+- **Container optimization**: Deploy mais rápido e barato
+- **Observability**: Troubleshooting facilitado com tracing nativo
+
+#### Nota
+Versão STS (Standard Term Support) - 18 meses de suporte apenas
+
+---
+
+### .NET 8 (Novembro 2023) – LTS com Native AOT Maduro
+**C# 12.0 | Performance recorde**
+
+#### Marcos Principais
+- **Versão LTS**: Suporte até novembro de 2026
+- **Native AOT maduro**: Compilação ahead-of-time para performance extrema
+- **C# 12**: Primary constructors, collection expressions `[1,2,3]`
+- **Blazor United**: SSR, Streaming, Auto mode
+- **Performance**: 20% mais rápido que .NET 7
+- **Containers**: .NET Aspire para cloud-native orchestration
+
+#### Vantagens Detalhadas
+
+**1. Native AOT (Ahead-of-Time Compilation)**
+- Startup < 100ms (vs. 2-5s em JIT)
+- Consumo de memória 50-70% menor
+- Executáveis auto-contidos (sem runtime dependency)
+- Ideal para: Serverless (AWS Lambda), containers, CLI tools
+
+**2. Blazor United**
+- **SSR (Server-Side Rendering)**: SEO-friendly
+- **Streaming**: Carregamento progressivo
+- **Auto mode**: Cliente/Servidor automático
+- Performance web moderna competindo com React/Vue
+
+**3. .NET Aspire**
+- Orchestration de microservices local
+- Service discovery automático
+- Telemetria integrada (logs, metrics, traces)
+- Ambiente de desenvolvimento cloud-native
+
+**4. Performance Benchmarks**
+- JSON serialization: 3x mais rápida
+- HTTP throughput: 100k+ req/s
+- Memory allocation: 30% redução
+
+#### Depreciações e Migrações
+
+| Recurso .NET 4.x/Core 3.x | Status em .NET 8 | Alternativa |
+|---------------------------|------------------|-------------|
+| Newtonsoft.Json | Suportado mas não recomendado | **System.Text.Json** (nativo, 3-5x mais rápido) |
+| Entity Framework 6.x | Modo manutenção | **Entity Framework Core 8** (cross-platform, LINQ melhorado) |
+| MVC com Views pesadas | Suportado | **Minimal APIs** (APIs), **Blazor** (UI) |
+| SignalR em System.Web | Removido | **ASP.NET Core SignalR** (cross-platform) |
+
+---
+
+### .NET 9 (Novembro 2024) – AI-First Development
+**C# 13.0 | Inteligência artificial integrada**
+
+#### Marcos Principais
+- **AI Tooling**: Semantic Kernel integrado, Microsoft.Extensions.AI
+- **C# 13**: params Span<T>, partial properties, field keyword, lock improvements
+- **Performance**: Mais 10-15% sobre .NET 8
+- **Blazor**: Prerendering melhorado, SignalR WebSockets
+- **MAUI**: HybridWebView, controles nativos melhorados
+- **Tensors e AI**: System.Numerics.Tensors para ML.NET
+
+#### Vantagens Detalhadas
+
+**1. Semantic Kernel e AI**
+- Framework para criar AI agents
+- Integração com OpenAI, Azure OpenAI, modelos locais
+- RAG (Retrieval-Augmented Generation) nativo
+- Orquestração de prompts e pipelines
+
+**2. params Span<T>**
+- Zero alocações em parâmetros variáveis
+- Performance crítica em hot paths
+```csharp
+void Log(params ReadOnlySpan<string> messages) { 
+    // Zero heap allocation
+}
+```
+
+**3. Lock Improvements**
+- Novo tipo `System.Threading.Lock` mais performático
+- Reduz contenção em cenários multi-thread
+- Até 2x mais rápido que `lock` tradicional
+
+**4. Tensors para ML**
+- Manipulação eficiente de matrizes multidimensionais
+- Aceleração de hardware (GPU/TPU via ONNX)
+- Integração com TensorFlow e PyTorch
+
+#### Exemplo AI Agent
+```csharp
+var kernel = Kernel.CreateBuilder()
+    .AddAzureOpenAIChatCompletion("gpt-4", endpoint, apiKey)
+    .Build();
+
+var result = await kernel.InvokePromptAsync(
+    "Resuma este texto: {{$input}}",
+    new() { ["input"] = longText }
+);
+```
+
+---
+
+### .NET 10 (Novembro 2025) – LTS Estado-da-Arte
+**C# 14.0 | Autenticação moderna e extensões**
+
+#### Marcos Principais
+- **Versão LTS**: Suporte até novembro de 2028 (3 anos de suporte conforme política padrão LTS)
+- **Passkeys (WebAuthn)**: Autenticação sem senha nativa
+- **C# 14**: Extension members, field keyword completo, null-conditional assignment
+- **Runtime JIT**: Otimizações de code layout e AVX-512/AVX10.2
+- **SDK improvements**: Microsoft.Testing.Platform, containerização simplificada
+- **Async ZIP APIs**: Manipulação assíncrona de arquivos comprimidos
+- **Post-Quantum Cryptography**: ML-KEM, ML-DSA para segurança quântica
+
+#### Vantagens Detalhadas
+
+**1. Passkeys e Autenticação Moderna**
+- **WebAuthn nativo**: APIs integradas para autenticação sem senha
+- **Biometria**: Face ID, Touch ID, Windows Hello
+- **Segurança**: Resistente a phishing e credential stuffing
+- **UX**: Login 3-5x mais rápido que senha tradicional
+
+**2. Extension Members (C# 14)**
+Nova sintaxe mais poderosa que extension methods:
+```csharp
+extension(IEnumerable<int> seq) {
+    public int Sum() => seq.Sum();
+    public static IEnumerable<int> Empty => Enumerable.Empty<int>();
+    // Permite propriedades e membros estáticos em extensions
+}
+```
+
+**3. Runtime e Performance**
+- **AVX-512/AVX10.2**: Vetorização automática para CPUs modernas
+- **Code layout**: JIT reorganiza código para melhor cache locality
+- **Loop optimizations**: Inversão e unrolling automáticos
+- **Benchmarks**: 5-10% mais rápido que .NET 9 em workloads típicos
+
+**4. Post-Quantum Cryptography**
+Proteção contra computadores quânticos:
+```csharp
+// ML-KEM (Module-Lattice-Based Key Encapsulation)
+var kyber = MlKem.Create(MlKemParameterSpec.ML_KEM_768);
+var (publicKey, privateKey) = kyber.GenerateKeyPair();
+
+// Resistente a algoritmos de Shor (quebra RSA em quantum)
+```
+
+**5. Developer Experience**
+- **Microsoft.Testing.Platform**: Nova infraestrutura de testes unificada
+- **Container publishing**: `dotnet publish --os linux --arch x64 /t:PublishContainer`
+- **Blazor preloading**: Carregamento otimizado de assemblies
+- **MAUI MediaPicker**: Múltiplos arquivos, melhor UX
+
+#### Comparação de Performance (.NET 4.5 vs .NET 10)
+
+| Métrica | .NET 4.5 | .NET 10 | Melhoria |
+|---------|----------|---------|----------|
+| **JSON Serialization** (1MB) | 150ms | 15ms | **10x** |
+| **HTTP Throughput** | 30k req/s | 150k req/s | **5x** |
+| **Startup Time** (console) | 2000ms | 50ms (AOT) | **40x** |
+| **Memory Usage** (Web API) | 200MB | 80MB | **-60%** |
+| **Build Time** (incremental) | 30s | 3s | **10x** |
+| **Container Image** | N/A | 110MB | **Native** |
+
+---
+
+### Tabela Resumo: Evolução e Decisões Estratégicas
+
+| Versão | Lançamento | Suporte Até | LTS? | Principais Features | Quando Usar |
+|--------|------------|-------------|------|---------------------|-------------|
+| **.NET 4.5-4.8** | 2012-2019 | Vinculado ao Windows | Sim¹ | Async/await, EF, WCF | **Legado apenas** (migre urgente) |
+| **.NET Core 3.1** | Dez 2019 | Dez 2022 (encerrado) | Sim | Desktop, Blazor, C# 8 | **EOL** - não use mais |
+| **.NET 5** | Nov 2020 | Mai 2022 (encerrado) | Não | Unificação, performance | **EOL** - não use mais |
+| **.NET 6** | Nov 2021 | Nov 2024 (encerrado) | Sim | MAUI, Minimal APIs, Hot Reload | **EOL** - migre para 8/10 |
+| **.NET 7** | Nov 2022 | Mai 2024 (encerrado) | Não | Performance, observability | **EOL** - não use mais |
+| **.NET 8** | Nov 2023 | **Nov 2026** | Sim | Native AOT, Blazor United, Aspire | **Produção OK** (LTS ativo) |
+| **.NET 9** | Nov 2024 | **Mai 2026** | Não | AI tooling, C# 13 | **Inovadores apenas** (STS) |
+| **.NET 10** | Nov 2025 | **Nov 2028** | Sim | Passkeys, C# 14, Quantum crypto | **RECOMENDADO** (LTS mais recente) |
+
+**¹ Nota**: O suporte do .NET Framework 4.5-4.8 está vinculado ao ciclo de vida do Windows (diferente da política LTS de 3 anos do .NET moderno). Recebe apenas correções de segurança críticas, sem novas features.
+
+**Recomendação 2026**: 
+- **Projetos novos**: Use .NET 10 (LTS até 2028)
+- **Produção existente em .NET 8**: Mantenha (LTS até nov/2026) ou migre para 10
+- **Qualquer versão < 8**: **Migre urgentemente** (EOL ou sem suporte em breve)
+
+---
+
+### Propostas de Substituição para Recursos Depreciados
+
+Esta seção consolida **todas as tecnologias descontinuadas** e suas alternativas modernas.
+
+#### 1. Comunicação e APIs
+
+| Depreciado | Problema | Substituto Recomendado | Vantagens |
+|------------|----------|------------------------|-----------|
+| **WCF (Windows Communication Foundation)** | Windows-only, complexo, lento | **gRPC** | Type-safe, 5-10x mais rápido, cross-platform, HTTP/2 nativo |
+| | | **ASP.NET Core Web API** | REST simples, JSON, documentação Swagger automática |
+| **Remoting** | Inseguro, binário proprietário | **gRPC** ou **SignalR** | Modernos, seguros, suporte bidirecional |
+| **ASMX Web Services** | SOAP obsoleto, XML pesado | **REST APIs (ASP.NET Core)** | JSON leve, HTTP padrão, fácil consumo |
+
+**Exemplo de Migração WCF → gRPC**:
+```csharp
+// ❌ WCF Service (.NET 4.5)
+[ServiceContract]
+public interface IOrderService {
+    [OperationContract]
+    Order GetOrder(int id);
+}
+
+// ✅ gRPC (.NET 10)
+// arquivo orders.proto
+service OrderService {
+    rpc GetOrder (OrderRequest) returns (OrderResponse);
+}
+
+// Implementação
+public class OrderService : OrderServiceBase {
+    public override Task<OrderResponse> GetOrder(
+        OrderRequest request, ServerCallContext context) 
+    {
+        var order = _repository.Get(request.Id);
+        return Task.FromResult(new OrderResponse { /* ... */ });
+    }
+}
+```
+
+#### 2. Interfaces Web
+
+| Depreciado | Problema | Substituto Recomendado | Vantagens |
+|------------|----------|------------------------|-----------|
+| **WebForms** | Stateful, ViewState, não escalável | **Blazor Server/WASM** | Componentes modernos, C# no client, reativo |
+| | | **Razor Pages** | MVC simplificado, page-based, produtivo |
+| **MVC Views pesadas** | Lógica no Razor, difícil testar | **Blazor Components** | Separação clara, reutilizável, testável |
+| **System.Web** | Acoplado ao IIS, Windows-only | **ASP.NET Core (Kestrel)** | Cross-platform, containerizável, 10x mais rápido |
+
+**Exemplo de Migração WebForms → Blazor**:
+```razor
+@* ❌ WebForms (.NET 4.5) *@
+<asp:GridView ID="grid" runat="server" DataSourceID="ds" />
+<asp:SqlDataSource ID="ds" ConnectionString="..." />
+
+@* ✅ Blazor (.NET 10) *@
+<MudDataGrid Items="@produtos" Loading="@loading">
+    <Columns>
+        <PropertyColumn Property="p => p.Nome" />
+        <PropertyColumn Property="p => p.Preco" Format="C2" />
+    </Columns>
+</MudDataGrid>
+
+@code {
+    List<Produto> produtos;
+    bool loading = true;
+    
+    protected override async Task OnInitializedAsync() {
+        produtos = await Http.GetFromJsonAsync<List<Produto>>("api/produtos");
+        loading = false;
+    }
+}
+```
+
+#### 3. Serialização e Dados
+
+| Depreciado | Problema | Substituto Recomendado | Vantagens |
+|------------|----------|------------------------|-----------|
+| **BinaryFormatter** | **VULNERABILIDADE CRÍTICA** (CVE-2017-8759) | **System.Text.Json** | Seguro, 3-5x mais rápido, async nativo |
+| | | **Protobuf (Google)** | Binário compacto, schema, type-safe |
+| | | **MessagePack** | Binário ultra-rápido, compacto |
+| **Newtonsoft.Json** | Mais lento, reflection-based | **System.Text.Json** | Nativo, source generators, zero-allocation |
+| **DataSet/DataTable** | Pesado, não type-safe | **Entity Framework Core** | ORM moderno, LINQ, async |
+| | | **Dapper** | Micro-ORM performático, SQL explícito |
+| **LINQ to SQL** | Descontinuado em 2008 | **Entity Framework Core** | Ativo, cross-database, migrations |
+
+**Exemplo System.Text.Json com Source Generators**:
+```csharp
+// Alta performance com zero-reflection
+[JsonSerializable(typeof(Order))]
+[JsonSerializable(typeof(List<Product>))]
+public partial class AppJsonContext : JsonSerializerContext { }
+
+// Uso
+var json = JsonSerializer.Serialize(order, AppJsonContext.Default.Order);
+var order = JsonSerializer.Deserialize(json, AppJsonContext.Default.Order);
+// 10-100x mais rápido que Newtonsoft.Json em serialização com source generators
+// (benchmarks para objetos POCO simples, varia conforme complexidade)
+```
+
+#### 4. Isolamento e Segurança
+
+| Depreciado | Problema | Substituto Recomendado | Vantagens |
+|------------|----------|------------------------|-----------|
+| **AppDomains** | Windows-only, pesado, não existe em .NET Core+ | **AssemblyLoadContext** | Cross-platform, isolamento leve |
+| | | **Processos separados** | Isolamento completo, crash-proof |
+| | | **Containers (Docker)** | Isolamento OS-level, portável |
+| **Code Access Security (CAS)** | Modelo obsoleto, ineficaz | **Containers + RBAC** | Segurança moderna, princípio do menor privilégio |
+| | | **Sandboxing OS** | AppArmor, SELinux, Windows Containers |
+| **ClickOnce** | Deployment antigo | **MSIX** (Windows) | Moderno, Store-ready |
+| | | **Docker/Kubernetes** | Cloud-native deployment |
+
+**Exemplo AssemblyLoadContext**:
+```csharp
+// Carregamento isolado de assemblies (plugins)
+var context = new AssemblyLoadContext("PluginContext", isCollectible: true);
+var assembly = context.LoadFromAssemblyPath(pluginPath);
+var type = assembly.GetType("MyPlugin.PluginClass");
+var plugin = Activator.CreateInstance(type);
+
+// Descarregamento (GC friendly)
+context.Unload();
+```
+
+#### 5. Desktop e UI
+
+| Depreciado | Problema | Substituto Recomendado | Vantagens |
+|------------|----------|------------------------|-----------|
+| **WPF (limitado)** | Windows-only | **MAUI** | Cross-platform (Win/Mac/iOS/Android) |
+| | | **Avalonia UI** | Cross-platform, XAML familiar |
+| **WinForms (limitado)** | Windows-only, visual antigo | **MAUI** | Moderno, mobile-ready |
+| **Silverlight** | **MORTO** (EOL 2021) | **Blazor WebAssembly** | C# no browser, WebAssembly |
+| **Windows Phone** | **MORTO** (EOL 2017) | **MAUI (Android/iOS)** | Ecossistema ativo |
+
+#### 6. Bibliotecas Específicas do Windows
+
+| Depreciado/Limitado | Problema | Substituto Recomendado | Vantagens |
+|---------------------|----------|------------------------|-----------|
+| **System.Drawing** | GDI+ Windows-only, bugs em Linux | **SkiaSharp** | Cross-platform, GPU-accelerated, moderno |
+| | | **ImageSharp** | .NET puro, cross-platform, async |
+| **Registry (Microsoft.Win32.Registry)** | Windows-only | **Configuration APIs** | Cross-platform (JSON/env vars/Azure KeyVault) |
+| **EventLog** | Windows-only | **Logging abstractions** | Serilog, NLog, Microsoft.Extensions.Logging |
+| **Performance Counters** | Windows-only | **Metrics APIs (.NET 8+)** | OpenTelemetry, Prometheus-compatible |
+
+**Exemplo Migração System.Drawing → SkiaSharp**:
+```csharp
+// ❌ System.Drawing (problemas no Linux)
+using (var bitmap = new Bitmap(800, 600)) {
+    using (var graphics = Graphics.FromImage(bitmap)) {
+        graphics.DrawString("Hello", font, brush, 10, 10);
+    }
+    bitmap.Save("output.png");
+}
+
+// ✅ SkiaSharp (cross-platform)
+var info = new SKImageInfo(800, 600);
+using var surface = SKSurface.Create(info);
+var canvas = surface.Canvas;
+canvas.Clear(SKColors.White);
+canvas.DrawText("Hello", 10, 30, new SKPaint { 
+    Color = SKColors.Black, 
+    TextSize = 24 
+});
+using var image = surface.Snapshot();
+using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+File.WriteAllBytes("output.png", data.ToArray());
+```
+
+#### 7. Configuração e Deployment
+
+| Depreciado | Problema | Substituto Recomendado | Vantagens |
+|------------|----------|------------------------|-----------|
+| **app.config/web.config XML** | Verboso, difícil versionar | **appsettings.json** | Tipado, hierarchical, environment-aware |
+| | | **Azure App Configuration** | Centralizado, feature flags, hot reload |
+| **Global Assembly Cache (GAC)** | Monólito Windows | **NuGet packages** | Versionamento explícito, portable |
+| **xcopy deployment** | Manual, propenso a erros | **Docker images** | Reproduzível, immutable, versionado |
+| | | **dotnet publish** | Self-contained, single-file, trimmed |
+
+---
+
+### Estratégias de Migração por Cenário
+
+#### Cenário 1: Web API (.NET 4.5 MVC → .NET 10 Minimal API)
+**Esforço**: Baixo a Médio | **Tempo**: 2-6 semanas
+
+1. **Análise**: Identifique controllers, autenticação, middleware
+2. **Incremental**: Use .NET Upgrade Assistant
+3. **Conversão**: Controllers → MapGroup() endpoints
+4. **Teste**: Mantenha mesmos testes de integração
+5. **Deploy**: Docker + Kubernetes/Azure App Service
+
+**Ganhos**:
+- 70% menos código
+- 3-5x mais throughput
+- 50% menos memória
+
+#### Cenário 2: WebForms → Blazor
+**Esforço**: Alto | **Tempo**: 3-12 meses
+
+1. **Análise**: Mapeie pages, controls, ViewState
+2. **Estratégia**: Strangler Pattern (migre página por página)
+3. **Componentes**: Crie Blazor components equivalentes
+4. **Estado**: Use Blazor state management (Fluxor, built-in)
+5. **Interop**: Mantenha .NET 4.8 e Blazor coexistindo (reverse proxy)
+
+**Ganhos**:
+- Componentes reutilizáveis
+- C# full-stack
+- Melhor testabilidade
+
+#### Cenário 3: WCF → gRPC
+**Esforço**: Médio | **Tempo**: 4-10 semanas
+
+1. **Contratos**: Converta ServiceContract → .proto files
+2. **Código**: Use grpc-dotnet (não WCF-like CoreWCF)
+3. **Clientes**: Atualize clientes para gRPC clients
+4. **Coexistência**: Mantenha WCF e gRPC em paralelo (transitório)
+5. **Cutover**: Migre clientes gradualmente
+
+**Ganhos**:
+- 5-10x melhor performance
+- Type safety em C#/Proto
+- HTTP/2 streaming nativo
+
+---
+
+### Checklist de Decisão: Qual Versão Usar?
+
+Use este fluxograma para decidir:
+
+```
+┌─ Projeto novo? 
+│  └─ SIM → .NET 10 (LTS até 2028) ✅
+│  
+├─ Projeto existente em .NET 8?
+│  └─ SIM → Mantenha (LTS até 2026) ou migre para 10 se precisar de passkeys/C# 14
+│  
+├─ Projeto em .NET 6 ou anterior?
+│  └─ SIM → MIGRE URGENTE para 8 ou 10 (EOL ou próximo de EOL)
+│  
+├─ Projeto em .NET Framework 4.x?
+│  ├─ Desktop (WPF/WinForms) → .NET 10 + MAUI (ou mantenha desktop em .NET 10)
+│  ├─ Web (WebForms/MVC) → .NET 10 + Blazor/Minimal APIs
+│  ├─ WCF Services → .NET 10 + gRPC
+│  └─ Windows-only necessário? → .NET 10 ainda roda no Windows (apenas)
+│  
+└─ Precisa de features experimentais?
+   └─ SIM → .NET 9 (mas planeje migração para 10 em nov/2025)
+```
+
+---
+
+### Recursos e Ferramentas de Migração
+
+#### Ferramentas Oficiais Microsoft
+1. **dotnet upgrade-assistant**: CLI para migração automática
+   ```bash
+   dotnet tool install -g upgrade-assistant
+   upgrade-assistant upgrade MyProject.csproj
+   ```
+
+2. **.NET Portability Analyzer**: Analisa compatibilidade
+   ```bash
+   dotnet tool install -g dotnet-apiport
+   ApiPort analyze -f MyApp.dll -t ".NET 10.0"
+   ```
+
+3. **Try-Convert**: Converte projetos antigos para SDK-style
+   ```bash
+   dotnet tool install -g try-convert
+   try-convert -p MyProject.csproj
+   ```
+
+#### Recursos de Aprendizado
+- **Microsoft Learn**: [https://learn.microsoft.com/dotnet](https://learn.microsoft.com/dotnet)
+- **.NET Conf**: Conferência anual gratuita (novembro)
+- **GitHub Discussions**: [https://github.com/dotnet/runtime/discussions](https://github.com/dotnet/runtime/discussions)
+- **Weekly .NET Updates**: [https://devblogs.microsoft.com/dotnet/](https://devblogs.microsoft.com/dotnet/)
+
+---
+
+### Resumo Executivo do Capítulo 1
+
+**Evolução em Números**:
+- **14 anos** de evolução (.NET 4.5 em 2012 → .NET 10 em 2025)
+- **10 versões** principais do .NET moderno
+- **40-50x** melhoria em startup time (com AOT)
+- **5-10x** melhoria em throughput HTTP
+- **60%** redução no uso de memória
+- **70%** redução em linhas de código (Minimal APIs)
+
+**Principais Marcos Históricos**:
+1. **.NET 4.5** (2012): Async/await revolucionário
+2. **.NET Core 1.0** (2016): Renascimento cross-platform
+3. **.NET 5** (2020): Unificação histórica
+4. **.NET 6** (2021): MAUI e produtividade (LTS)
+5. **.NET 8** (2023): Native AOT maduro (LTS)
+6. **.NET 10** (2025): Estado-da-arte com passkeys e AI (LTS atual)
+
+**Depreciações Críticas**:
+- WCF → gRPC (5-10x mais rápido)
+- WebForms → Blazor (componentes modernos)
+- BinaryFormatter → System.Text.Json (seguro)
+- AppDomains → Containers (isolamento moderno)
+- System.Drawing → SkiaSharp (cross-platform)
+
+**Recomendação Final 2026**:
+- **Projetos novos**: .NET 10 (LTS até 2028)
+- **Produção crítica**: .NET 8 ou 10 (LTS apenas)
+- **Migração de .NET 4.x**: Urgente - suporte limitado
+
+O .NET evoluiu de uma plataforma Windows-only para o ecossistema moderno mais completo da indústria. A jornada de .NET 4.5 para .NET 10 não é apenas uma atualização de versão - é uma transformação completa em performance, segurança, produtividade e capacidades cross-platform.
 
 ---
 
