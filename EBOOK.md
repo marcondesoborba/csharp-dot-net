@@ -629,7 +629,7 @@ var result = await kernel.InvokePromptAsync(
 **C# 14.0 | Autenticação moderna e extensões**
 
 #### Marcos Principais
-- **Versão LTS**: Suporte até novembro de 2028 (3 anos)
+- **Versão LTS**: Suporte até novembro de 2028 (3 anos de suporte conforme política padrão LTS)
 - **Passkeys (WebAuthn)**: Autenticação sem senha nativa
 - **C# 14**: Extension members, field keyword completo, null-conditional assignment
 - **Runtime JIT**: Otimizações de code layout e AVX-512/AVX10.2
@@ -694,7 +694,7 @@ var (publicKey, privateKey) = kyber.GenerateKeyPair();
 
 | Versão | Lançamento | Suporte Até | LTS? | Principais Features | Quando Usar |
 |--------|------------|-------------|------|---------------------|-------------|
-| **.NET 4.5-4.8** | 2012-2019 | Vinculado ao Windows | Sim* | Async/await, EF, WCF | **Legado apenas** (migre urgente) |
+| **.NET 4.5-4.8** | 2012-2019 | Vinculado ao Windows | Sim¹ | Async/await, EF, WCF | **Legado apenas** (migre urgente) |
 | **.NET Core 3.1** | Dez 2019 | Dez 2022 (encerrado) | Sim | Desktop, Blazor, C# 8 | **EOL** - não use mais |
 | **.NET 5** | Nov 2020 | Mai 2022 (encerrado) | Não | Unificação, performance | **EOL** - não use mais |
 | **.NET 6** | Nov 2021 | Nov 2024 (encerrado) | Sim | MAUI, Minimal APIs, Hot Reload | **EOL** - migre para 8/10 |
@@ -702,6 +702,8 @@ var (publicKey, privateKey) = kyber.GenerateKeyPair();
 | **.NET 8** | Nov 2023 | **Nov 2026** | Sim | Native AOT, Blazor United, Aspire | **Produção OK** (LTS ativo) |
 | **.NET 9** | Nov 2024 | **Mai 2026** | Não | AI tooling, C# 13 | **Inovadores apenas** (STS) |
 | **.NET 10** | Nov 2025 | **Nov 2028** | Sim | Passkeys, C# 14, Quantum crypto | **RECOMENDADO** (LTS mais recente) |
+
+**¹ Nota**: O suporte do .NET Framework 4.5-4.8 está vinculado ao ciclo de vida do Windows (diferente da política LTS de 3 anos do .NET moderno). Recebe apenas correções de segurança críticas, sem novas features.
 
 **Recomendação 2026**: 
 - **Projetos novos**: Use .NET 10 (LTS até 2028)
@@ -805,7 +807,8 @@ public partial class AppJsonContext : JsonSerializerContext { }
 // Uso
 var json = JsonSerializer.Serialize(order, AppJsonContext.Default.Order);
 var order = JsonSerializer.Deserialize(json, AppJsonContext.Default.Order);
-// 10-100x mais rápido que Newtonsoft em serialização
+// 10-100x mais rápido que Newtonsoft.Json em serialização com source generators
+// (benchmarks para objetos POCO simples, varia conforme complexidade)
 ```
 
 #### 4. Isolamento e Segurança
