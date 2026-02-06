@@ -1654,6 +1654,295 @@ var objetoRecuperado = JsonSerializer.Deserialize<MeuTipo>(jsonTexto, opcoes);
 
 ---
 
+### 2.3. Estratégias de Migração
+
+Existem diferentes abordagens para migrar um sistema legado para .NET 10. A escolha da estratégia depende do tamanho do projeto, criticidade do sistema e recursos disponíveis.
+
+#### 2.3.1. Strangler Pattern (Migração Incremental) - RECOMENDADO
+
+O padrão Strangler permite migrar o sistema gradualmente, mantendo ambas as versões rodando simultaneamente e transferindo funcionalidades incrementalmente.
+
+**Como Funciona:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│ FASE 1: Sistema Original                           │
+│                                                     │
+│  Cliente → [.NET 4.5 App Monolítico]               │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ FASE 2: Início da Migração (Proxy/Gateway)         │
+│                                                     │
+│  Cliente → [API Gateway/Proxy]                     │
+│                ↓              ↓                     │
+│         [.NET 4.5 App]  [.NET 10 - Módulo Novo]    │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ FASE 3: Migração Progressiva                       │
+│                                                     │
+│  Cliente → [API Gateway]                           │
+│                ↓              ↓                     │
+│         [.NET 4.5 - 40%]  [.NET 10 - 60%]          │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ FASE FINAL: Migração Completa                      │
+│                                                     │
+│  Cliente → [.NET 10 - 100%]                        │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Implementação Prática com YARP (Reverse Proxy):**
+
+```csharp
+// .NET 10 - API Gateway usando YARP (Yet Another Reverse Proxy)
+// Program.cs
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
+var app = builder.Build();
+
+// Rotas novas vão para .NET 10
+app.MapGet("/api/v2/pedidos/{id}", async (int id, IPedidoServico servico) =>
+{
+    var pedido = await servico.ObterPorIdAsync(id);
+    return Results.Ok(pedido);
+});
+
+// Rotas legadas redirecionam para .NET 4.5
+app.MapReverseProxy();
+
+app.Run();
+
+// appsettings.json - Configuração de roteamento
+/*
+{
+  "ReverseProxy": {
+    "Routes": {
+      "legacy-route": {
+        "ClusterId": "dotnet45-cluster",
+        "Match": {
+          "Path": "/api/v1/{**catch-all}"
+        }
+      }
+    },
+    "Clusters": {
+      "dotnet45-cluster": {
+        "Destinations": {
+          "destination1": {
+            "Address": "http://legacy-server:8080/"
+          }
+        }
+      }
+    }
+  }
+}
+*/
+```
+
+**Vantagens do Strangler Pattern:**
+- ✅ Menor risco - sistema continua funcionando durante migração
+- ✅ Entregas incrementais - valor entregue continuamente
+- ✅ Permite aprendizado - equipe aprende .NET 10 gradualmente
+- ✅ Rollback fácil - problemas em um módulo não afetam outros
+
+**Desvantagens:**
+- ⚠️ Complexidade temporária - dois sistemas rodando simultaneamente
+- ⚠️ Sincronização de dados - bancos de dados compartilhados requerem cuidado
+- ⚠️ Tempo total maior - migração completa leva mais tempo que Big Bang
+
+#### 2.3.2. Big Bang Rewrite (Migração Completa de Uma Vez)
+
+Reescrever e substituir todo o sistema de uma só vez. **Adequado apenas para projetos pequenos (<20k linhas)**.
+
+**Quando Usar:**
+- Projeto pequeno e bem definido
+- Código legado de qualidade muito baixa
+- Necessidade de mudanças arquiteturais profundas
+- Time grande e dedicado exclusivamente à migração
+
+**Processo:**
+
+```csharp
+// Etapa 1: Criar projeto .NET 10 do zero
+dotnet new webapi -n MeuProjetoNovo -f net10.0
+
+// Etapa 2: Portar modelos de dados
+// ANTES (.NET 4.5)
+public class Cliente
+{
+    public int Id { get; set; }
+    public string Nome { get; set; }
+    public string Email { get; set; }
+}
+
+// DEPOIS (.NET 10 - com nullable reference types)
+public record Cliente(
+    int Id,
+    string Nome,
+    string Email,
+    DateTime DataCriacao)
+{
+    // Validação integrada
+    public bool EmailValido => Email.Contains('@');
+}
+
+// Etapa 3: Reescrever lógica com padrões modernos
+// ANTES: Repository padrão antigo
+public class ClienteRepository
+{
+    private readonly SqlConnection _conexao;
+    
+    public Cliente ObterPorId(int id)
+    {
+        using (var cmd = new SqlCommand("SELECT * FROM Clientes WHERE Id = @Id", _conexao))
+        {
+            cmd.Parameters.AddWithValue("@Id", id);
+            // ... código ADO.NET manual
+        }
+    }
+}
+
+// DEPOIS: Repository com EF Core e async
+public class ClienteRepositorio(AppDbContext contexto) : IClienteRepositorio
+{
+    public async Task<Cliente?> ObterPorIdAsync(int id, CancellationToken ct = default)
+    {
+        return await contexto.Clientes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+    }
+}
+
+// Etapa 4: Configurar CI/CD para deploy simultâneo
+// Executar testes comparativos (shadow mode)
+// Fazer cutover em horário de baixo tráfego
+```
+
+**Riscos do Big Bang:**
+- 🔴 Alto risco de falha catastrófica
+- 🔴 Impossível reverter facilmente após deploy
+- 🔴 Período longo sem entregas de valor
+- 🔴 Requer testing extensivo antes de produção
+
+#### 2.3.3. Abordagem Híbrida (Compartilhamento de Código)
+
+Manter partes do sistema em .NET Framework enquanto migra outras, usando **bibliotecas .NET Standard 2.0** para compartilhar código.
+
+**Cenário Ideal:**
+- Lógica de negócio complexa que não pode ser duplicada
+- Migração de UI/API mas manutenção de componentes core
+
+**Estrutura:**
+
+```
+Solução Híbrida/
+├── src/
+│   ├── MeuProjeto.Core/              # .NET Standard 2.0
+│   │   ├── Entidades/
+│   │   ├── Interfaces/
+│   │   └── Regras de Negócio/
+│   │
+│   ├── MeuProjeto.Legacy/            # .NET Framework 4.8
+│   │   ├── WebForms UI/
+│   │   └── Referencia → Core
+│   │
+│   └── MeuProjeto.Novo/              # .NET 10
+│       ├── Blazor UI/
+│       ├── APIs/
+│       └── Referencia → Core
+```
+
+**Exemplo de Biblioteca Compartilhada:**
+
+```csharp
+// MeuProjeto.Core (.NET Standard 2.0) - Compatível com ambos
+namespace MeuProjeto.Core;
+
+public interface ICalculadoraPreco
+{
+    decimal CalcularPrecoFinal(decimal precoBase, decimal desconto, decimal frete);
+}
+
+public class CalculadoraPreco : ICalculadoraPreco
+{
+    public decimal CalcularPrecoFinal(decimal precoBase, decimal desconto, decimal frete)
+    {
+        var precoComDesconto = precoBase * (1 - desconto / 100);
+        return precoComDesconto + frete;
+    }
+}
+
+// Uso em .NET 4.5 (WebForms)
+protected void btnCalcular_Click(object sender, EventArgs e)
+{
+    var calculadora = new CalculadoraPreco();
+    var total = calculadora.CalcularPrecoFinal(100m, 10m, 5m);
+    lblTotal.Text = $"Total: R$ {total}";
+}
+
+// Uso em .NET 10 (Blazor)
+@inject ICalculadoraPreco Calculadora
+
+<button @onclick="CalcularTotal">Calcular</button>
+<p>Total: R$ @valorTotal</p>
+
+@code {
+    private decimal valorTotal;
+    
+    private void CalcularTotal()
+    {
+        valorTotal = Calculadora.CalcularPrecoFinal(100m, 10m, 5m);
+    }
+}
+```
+
+**Limitações do .NET Standard 2.0:**
+- ❌ Não tem APIs mais recentes (Span<T>, System.Text.Json nativo)
+- ❌ Não suporta C# 11-14 features completas
+- ❌ Performance inferior ao .NET 10 puro
+
+#### 2.3.4. Comparação de Estratégias
+
+| Critério | Strangler Pattern | Big Bang Rewrite | Híbrida |
+|----------|-------------------|------------------|---------|
+| **Risco** | Baixo | Alto | Médio |
+| **Tempo total** | 6-18 meses | 2-6 meses | 3-12 meses |
+| **Complexidade** | Média (2 sistemas) | Alta (tudo de uma vez) | Alta (compatibilidade) |
+| **Custo** | Médio-Alto | Médio | Baixo-Médio |
+| **Entregas** | Contínuas | Uma única ao final | Modulares |
+| **Melhor para** | Sistemas críticos | Apps pequenos | Migração parcial |
+| **Rollback** | Fácil | Difícil | Médio |
+
+#### 2.3.5. Recomendação por Tamanho de Projeto
+
+```plaintext
+┌─────────────────────────────────────────────────────────┐
+│ PEQUENO (<10k linhas, <3 devs)                         │
+│ → Big Bang Rewrite                                     │
+│   Justificativa: Overhead de Strangler não compensa    │
+├─────────────────────────────────────────────────────────┤
+│ MÉDIO (10k-100k linhas, 3-10 devs)                     │
+│ → Strangler Pattern OU Híbrida                         │
+│   Justificativa: Balanço entre risco e velocidade      │
+├─────────────────────────────────────────────────────────┤
+│ GRANDE (>100k linhas, >10 devs)                        │
+│ → Strangler Pattern OBRIGATÓRIO                        │
+│   Justificativa: Risco de Big Bang é inaceitável       │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### Passos práticos:
 
 #### 1. Avalie seu projeto:
