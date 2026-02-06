@@ -2691,6 +2691,463 @@ app.UseMiddleware<TratadorExcecoesGlobal>();
 
 ---
 
+### 2.6. Problemas Comuns na Migração e Soluções
+
+Durante a migração de .NET Framework 4.5 para .NET 10, você encontrará erros específicos. Esta seção documenta os problemas mais comuns e suas soluções.
+
+#### 2.6.1. Erros de Compilação
+
+**Problema 1: "The type or namespace name 'HttpContext' could not be found"**
+
+```csharp
+// ERRO
+using System.Web;  // Não existe no .NET 10
+
+public class MeuServico
+{
+    public void ProcessarRequisicao()
+    {
+        var usuario = HttpContext.Current.User;  // ❌ Erro
+    }
+}
+```
+
+**Solução:**
+
+```csharp
+// CORREÇÃO
+using Microsoft.AspNetCore.Http;
+
+public class MeuServico(IHttpContextAccessor httpContextAccessor)
+{
+    public void ProcessarRequisicao()
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        var usuario = httpContext?.User;  // ✅ Funciona
+    }
+}
+
+// Registrar no Program.cs
+builder.Services.AddHttpContextAccessor();
+```
+
+**Problema 2: "Cannot convert from 'int?' to 'int'"**
+
+Nullable reference types habilitados por padrão causam warnings/erros:
+
+```csharp
+// ERRO
+public class Cliente
+{
+    public string Nome { get; set; }  // ❌ Warning: Non-nullable property must contain a non-null value
+}
+```
+
+**Solução Opção 1 - Tornar nullable:**
+
+```csharp
+public class Cliente
+{
+    public string? Nome { get; set; }  // ✅ Explicitamente nullable
+}
+```
+
+**Solução Opção 2 - Desabilitar (não recomendado):**
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Nullable>disable</Nullable>  <!-- Desabilita para todo o projeto -->
+  </PropertyGroup>
+</Project>
+```
+
+**Problema 3: "DbSet does not contain definition for 'SqlQuery'"**
+
+```csharp
+// ERRO - EF6 para EF Core
+var produtos = contexto.Produtos
+    .SqlQuery("SELECT * FROM Produtos WHERE Ativo = 1")  // ❌ Não existe
+    .ToList();
+```
+
+**Solução:**
+
+```csharp
+// CORREÇÃO - EF Core 8
+var produtos = contexto.Produtos
+    .FromSqlRaw("SELECT * FROM Produtos WHERE Ativo = {0}", 1)  // ✅ Funciona
+    .ToList();
+
+// Ou melhor ainda - interpolação segura
+var ativo = true;
+var produtos = contexto.Produtos
+    .FromSqlInterpolated($"SELECT * FROM Produtos WHERE Ativo = {ativo}")
+    .ToList();
+```
+
+#### 2.6.2. Problemas de Runtime
+
+**Problema 4: "PlatformNotSupportedException" em Linux**
+
+Código que usa APIs específicas do Windows falha em runtime:
+
+```csharp
+// PROBLEMA
+using System.Drawing;  // System.Drawing.Common não funciona bem em Linux
+
+public byte[] GerarImagem()
+{
+    using var bitmap = new Bitmap(800, 600);
+    // ... código de desenho
+    // ❌ Lança PlatformNotSupportedException em Linux
+}
+```
+
+**Solução:**
+
+```csharp
+// CORREÇÃO - Usar biblioteca cross-platform
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+
+public byte[] GerarImagem()
+{
+    using var imagem = new Image<Rgba32>(800, 600);
+    imagem.Mutate(ctx => 
+    {
+        ctx.BackgroundColor(Color.White);
+        // ... operações de desenho
+    });
+    
+    using var stream = new MemoryStream();
+    imagem.SaveAsPng(stream);
+    return stream.ToArray();  // ✅ Funciona em qualquer SO
+}
+
+// Adicionar ao .csproj
+// <PackageReference Include="SixLabors.ImageSharp" Version="3.1.0" />
+```
+
+**Problema 5: "Connection string provider not found"**
+
+```csharp
+// PROBLEMA
+var connectionString = "Server=localhost;Database=MeuDb;Integrated Security=True";
+// ❌ Integrated Security não funciona em Linux
+```
+
+**Solução:**
+
+```csharp
+// CORREÇÃO - Usar autenticação SQL
+// appsettings.json
+{
+  "ConnectionStrings": {
+    "Production": "Server=localhost;Database=MeuDb;User Id=sa;Password=SenhaSegura;TrustServerCertificate=True"
+  }
+}
+
+// Ou melhor - Azure AD / variáveis de ambiente
+{
+  "ConnectionStrings": {
+    "Production": "Server=servidor.database.windows.net;Database=MeuDb;Authentication=Active Directory Default"
+  }
+}
+```
+
+#### 2.6.3. Problemas de Performance
+
+**Problema 6: Serialização JSON 10x mais lenta**
+
+```csharp
+// PROBLEMA - Configuração sub-ótima
+var options = new JsonSerializerOptions
+{
+    PropertyNameCaseInsensitive = true,  // Impacto de performance
+    WriteIndented = true  // Consome mais CPU/memória em produção
+};
+
+foreach (var item in lista)  // Loop com milhares de itens
+{
+    var json = JsonSerializer.Serialize(item, options);  // ❌ Cria options toda vez
+}
+```
+
+**Solução:**
+
+```csharp
+// CORREÇÃO - Reutilizar options e Source Generators
+// 1. Criar options uma vez
+private static readonly JsonSerializerOptions _jsonOptions = new()
+{
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    // WriteIndented = false em produção
+};
+
+// 2. Usar Source Generators (C# 11+) para melhor performance
+[JsonSerializable(typeof(Produto))]
+[JsonSerializable(typeof(List<Produto>))]
+internal partial class AppJsonContext : JsonSerializerContext
+{
+}
+
+// 3. Usar com context
+var json = JsonSerializer.Serialize(produto, AppJsonContext.Default.Produto);  // ✅ 2-3x mais rápido
+```
+
+#### 2.6.4. Problemas de Migração de Dados
+
+**Problema 7: Migrations do EF6 não funcionam**
+
+```bash
+# ERRO
+PM> Update-Database
+The term 'Update-Database' is not recognized...
+```
+
+**Solução:**
+
+```bash
+# CORREÇÃO - Comandos do EF Core
+dotnet ef migrations add MigracaoInicial
+dotnet ef database update
+
+# Ou via Package Manager Console (Visual Studio)
+PM> Add-Migration MigracaoInicial
+PM> Update-Database
+```
+
+**Problema 8: Dados incompatíveis após migração**
+
+```csharp
+// PROBLEMA - DateTime serializado diferente
+// .NET 4.5: "2025-02-06T14:30:00"
+// .NET 10:  "2025-02-06T14:30:00.0000000Z"  (UTC com precisão)
+```
+
+**Solução:**
+
+```csharp
+// CORREÇÃO - Normalizar formato
+public class ClienteDto
+{
+    [JsonConverter(typeof(CustomDateTimeConverter))]
+    public DateTime DataCadastro { get; set; }
+}
+
+public class CustomDateTimeConverter : JsonConverter<DateTime>
+{
+    public override DateTime Read(ref Utf8JsonReader leitor, Type tipoParaConverter, JsonSerializerOptions opcoes)
+    {
+        return DateTime.Parse(leitor.GetString()!);
+    }
+    
+    public override void Write(Utf8JsonWriter escritor, DateTime valor, JsonSerializerOptions opcoes)
+    {
+        escritor.WriteStringValue(valor.ToString("yyyy-MM-ddTHH:mm:ss"));  // Formato fixo
+    }
+}
+```
+
+#### 2.6.5. Troubleshooting Guide Rápido
+
+| Sintoma | Causa Provável | Solução Rápida |
+|---------|---------------|----------------|
+| App não inicia em Linux | Caminho com `\` ao invés de `/` | Use `Path.Combine()` sempre |
+| Slow startup | Muitas dependências transitivas | Analise com `dotnet list package --include-transitive` |
+| High memory usage | DbContext não é Scoped | Registre como `AddDbContext` com Scoped |
+| NullReferenceException | Nullable contexts habilitados | Adicione `?` ou `!` nos lugares certos |
+| Serialização falha | Propriedades sem setter público | Adicione `init` ou construtor para records |
+| CORS errors | Policy não configurada | `builder.Services.AddCors()` no Program.cs |
+
+#### 2.6.6. Ferramentas de Diagnóstico
+
+**Analisar Dependências Problemáticas:**
+
+```bash
+# Verificar todas as dependências transitivas
+dotnet list package --include-transitive --vulnerable
+
+# Verificar pacotes desatualizados
+dotnet list package --outdated
+
+# Analisar tamanho do assembly
+dotnet publish -c Release
+# Verificar pasta bin/Release/net10.0/publish/
+```
+
+**Profiling de Performance:**
+
+```csharp
+// Adicionar ao Program.cs para diagnóstico
+using System.Diagnostics;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Habilitar métricas
+builder.Services.AddApplicationInsightsTelemetry();
+
+var app = builder.Build();
+
+// Middleware para medir tempo de requisições
+app.Use(async (context, next) =>
+{
+    var sw = Stopwatch.StartNew();
+    await next();
+    sw.Stop();
+    
+    if (sw.ElapsedMilliseconds > 1000)  // > 1 segundo
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(
+            "Requisição lenta: {Caminho} levou {Tempo}ms",
+            context.Request.Path, sw.ElapsedMilliseconds);
+    }
+});
+```
+
+---
+
+### 2.7. Validação Cross-Platform
+
+Uma das grandes vantagens do .NET 10 é rodar em qualquer sistema operacional. Esta seção mostra como validar sua aplicação em múltiplas plataformas.
+
+#### 2.7.1. Containerização com Docker
+
+**Criar Dockerfile para .NET 10:**
+
+```dockerfile
+# Dockerfile
+# Estágio 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS construcao
+WORKDIR /codigo
+
+# Copiar apenas arquivos de projeto primeiro (cache de layers)
+COPY *.csproj .
+RUN dotnet restore
+
+# Copiar código fonte e compilar
+COPY . .
+RUN dotnet publish -c Release -o /app/publicado --no-restore
+
+# Estágio 2: Runtime (imagem menor)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+COPY --from=construcao /app/publicado .
+
+# Configurar usuário não-root (segurança)
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "MinhaAplicacao.dll"]
+```
+
+**Build e teste local:**
+
+```bash
+# Build da imagem
+docker build -t minha-app:latest .
+
+# Executar container
+docker run -p 8080:8080 --name teste-app minha-app:latest
+
+# Testar endpoint
+curl http://localhost:8080/api/health
+
+# Ver logs
+docker logs teste-app
+
+# Cleanup
+docker stop teste-app && docker rm teste-app
+```
+
+#### 2.7.2. Teste Automatizado Multi-Plataforma
+
+**GitHub Actions Workflow:**
+
+```yaml
+# .github/workflows/build-test.yml
+name: Build e Teste Multi-Plataforma
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  teste-multiplataforma:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        dotnet: ['10.0.x']
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ matrix.dotnet }}
+    
+    - name: Restore dependências
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+    
+    - name: Executar testes
+      run: dotnet test --no-build --configuration Release --verbosity normal
+    
+    - name: Publicar (apenas Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: dotnet publish -c Release -o ./publicado
+```
+
+#### 2.7.3. Testes de Integração Cross-Platform
+
+```csharp
+// Testes que verificam comportamento em diferentes SOs
+using Xunit;
+
+public class TestesCrossPlatform
+{
+    [Fact]
+    public void Deve_Lidar_Com_Caminhos_Corretamente()
+    {
+        // Usar Path.Combine para compatibilidade
+        var caminho = Path.Combine("dados", "config", "settings.json");
+        
+        // Verificar que funciona independente do SO
+        Assert.DoesNotContain("\\", caminho.Replace(Path.DirectorySeparatorChar.ToString(), ""));
+    }
+    
+    [Fact]
+    public async Task Deve_Conectar_Banco_Em_Container()
+    {
+        // Simula conexão com banco em container Docker
+        var connectionString = "Server=localhost,1433;Database=TestDB;User=sa;Password=Test123!";
+        
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+            
+        using var context = new AppDbContext(options);
+        
+        // Deve conectar sem erros platform-specific
+        var podeConectar = await context.Database.CanConnectAsync();
+        Assert.True(podeConectar || !OperatingSystem.IsWindows());  // Tolerante a ambiente de teste
+    }
+}
+```
+
+---
+
 ### Passos práticos:
 
 #### 1. Avalie seu projeto:
