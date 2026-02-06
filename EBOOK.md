@@ -1313,6 +1313,347 @@ Use esta matriz para decidir a melhor estratégia por módulo:
 
 ---
 
+### 2.2. Mapeamento de Tecnologias Descontinuadas
+
+Após a avaliação inicial, é crucial entender o caminho de migração para cada tecnologia descontinuada. Esta seção mapeia as principais tecnologias do .NET Framework 4.5 para suas equivalentes modernas no .NET 10.
+
+#### 2.2.1. Padrões de Comunicação e Serviços
+
+**De WCF para Alternativas Modernas**
+
+WCF foi a solução padrão para serviços distribuídos no .NET Framework, mas não está disponível no .NET 10. Aqui estão os caminhos de migração baseados no tipo de comunicação:
+
+| Cenário WCF Original | Tecnologia Substituta | Justificativa | Esforço |
+|----------------------|----------------------|---------------|---------|
+| Serviços SOAP internos | gRPC com Protobuf | Melhor performance (binário), contrato forte | Médio |
+| APIs públicas REST-like | ASP.NET Core Web API | Padrão moderno, OpenAPI/Swagger automático | Baixo |
+| Comunicação NetTcp | gRPC sobre HTTP/2 | Mesmo conceito (binário sobre TCP), melhor suporte | Médio |
+| Callbacks bidirecionais | SignalR Core | WebSockets nativos, push real-time | Alto |
+| Filas MSMQ | Azure Service Bus / RabbitMQ | Cloud-native, melhor confiabilidade | Alto |
+
+**Exemplo Prático - Migração WCF → gRPC:**
+
+```csharp
+// ANTES: .NET Framework 4.5 - Serviço WCF
+[ServiceContract]
+public interface IPedidoServico
+{
+    [OperationContract]
+    PedidoDto ObterPedido(int pedidoId);
+    
+    [OperationContract]
+    bool ProcessarPagamento(int pedidoId, decimal valor);
+}
+
+public class PedidoServico : IPedidoServico
+{
+    public PedidoDto ObterPedido(int pedidoId)
+    {
+        // Lógica de negócio
+        return new PedidoDto { Id = pedidoId, Total = 100.00m };
+    }
+    
+    public bool ProcessarPagamento(int pedidoId, decimal valor)
+    {
+        // Processamento
+        return true;
+    }
+}
+
+// DEPOIS: .NET 10 - Serviço gRPC
+// Arquivo: pedidos.proto
+/*
+syntax = "proto3";
+
+service PedidoService {
+  rpc ObterPedido (PedidoRequest) returns (PedidoResponse);
+  rpc ProcessarPagamento (PagamentoRequest) returns (PagamentoResponse);
+}
+
+message PedidoRequest {
+  int32 pedido_id = 1;
+}
+
+message PedidoResponse {
+  int32 id = 1;
+  double total = 2;
+}
+
+message PagamentoRequest {
+  int32 pedido_id = 1;
+  double valor = 2;
+}
+
+message PagamentoResponse {
+  bool sucesso = 1;
+}
+*/
+
+// Implementação C# gerada automaticamente do .proto
+public class PedidoService : PedidoService.PedidoServiceBase
+{
+    public override Task<PedidoResponse> ObterPedido(
+        PedidoRequest requisicao, 
+        ServerCallContext contexto)
+    {
+        return Task.FromResult(new PedidoResponse 
+        { 
+            Id = requisicao.PedidoId, 
+            Total = 100.00 
+        });
+    }
+    
+    public override Task<PagamentoResponse> ProcessarPagamento(
+        PagamentoRequest requisicao, 
+        ServerCallContext contexto)
+    {
+        // Lógica de processamento
+        return Task.FromResult(new PagamentoResponse { Sucesso = true });
+    }
+}
+```
+
+**Vantagens do gRPC sobre WCF:**
+- ⚡ 5-8x mais rápido em serialização binária
+- 🌍 Cross-platform completo (Linux, macOS, Windows)
+- 📝 Contratos fortemente tipados via Protobuf
+- 🔄 Streaming bidirecional nativo
+- ☁️ Melhor integração com Kubernetes e cloud
+
+#### 2.2.2. Camadas de Apresentação
+
+**De WebForms para Blazor**
+
+WebForms foi construído em torno de ViewState e postbacks, conceitos que não existem mais. A transição para Blazor requer mudança de paradigma:
+
+```csharp
+// ANTES: .NET Framework 4.5 - WebForms (.aspx + code-behind)
+// Default.aspx.cs
+public partial class Default : System.Web.UI.Page
+{
+    protected void Page_Load(object sender, EventArgs e)
+    {
+        if (!IsPostBack)
+        {
+            CarregarClientes();
+        }
+    }
+    
+    protected void btnSalvar_Click(object sender, EventArgs e)
+    {
+        var nomeCliente = txtNome.Text;
+        var emailCliente = txtEmail.Text;
+        
+        // Salvar no banco
+        SalvarCliente(nomeCliente, emailCliente);
+        
+        lblMensagem.Text = "Cliente salvo com sucesso!";
+        CarregarClientes();
+    }
+    
+    private void CarregarClientes()
+    {
+        gvClientes.DataSource = ObterTodosClientes();
+        gvClientes.DataBind();
+    }
+}
+
+// DEPOIS: .NET 10 - Blazor Server Component
+@page "/clientes"
+@inject IClienteRepositorio Repositorio
+
+<h3>Gerenciamento de Clientes</h3>
+
+<EditForm Model="novoCliente" OnValidSubmit="SalvarCliente">
+    <DataAnnotationsValidator />
+    
+    <InputText @bind-Value="novoCliente.Nome" placeholder="Nome" />
+    <InputText @bind-Value="novoCliente.Email" placeholder="Email" />
+    
+    <button type="submit">Salvar</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(mensagemStatus))
+{
+    <div class="alerta-sucesso">@mensagemStatus</div>
+}
+
+<table>
+    @foreach (var cliente in clientes)
+    {
+        <tr>
+            <td>@cliente.Nome</td>
+            <td>@cliente.Email</td>
+        </tr>
+    }
+</table>
+
+@code {
+    private ClienteModel novoCliente = new();
+    private List<ClienteModel> clientes = new();
+    private string mensagemStatus = "";
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarClientesAsync();
+    }
+    
+    private async Task SalvarCliente()
+    {
+        await Repositorio.AdicionarAsync(novoCliente);
+        mensagemStatus = "Cliente salvo com sucesso!";
+        
+        novoCliente = new ClienteModel();
+        await CarregarClientesAsync();
+    }
+    
+    private async Task CarregarClientesAsync()
+    {
+        clientes = await Repositorio.ObterTodosAsync();
+    }
+}
+```
+
+**Diferenças Fundamentais:**
+
+| Aspecto | WebForms (.NET 4.5) | Blazor (.NET 10) |
+|---------|---------------------|------------------|
+| **Modelo** | Stateful com ViewState | Componentes reativos |
+| **Ciclo de vida** | Page_Load → Eventos → PostBack | OnInitialized → Eventos → Re-render |
+| **Estado** | Armazenado em ViewState (client) | Mantido em memória (server) ou wasm (client) |
+| **Binding** | One-way, manual | Two-way automático (@bind) |
+| **Validação** | Validators com runat="server" | DataAnnotations integrado |
+| **Performance** | Cada ação = full page reload | Apenas componentes afetados re-renderizam |
+
+#### 2.2.3. Acesso a Dados
+
+**De Entity Framework 6 para EF Core 8**
+
+EF Core é uma reescrita completa, não apenas uma atualização:
+
+```csharp
+// ANTES: .NET Framework 4.5 - Entity Framework 6
+public class LojaContexto : DbContext
+{
+    public LojaContexto() : base("name=LojaConnection")
+    {
+    }
+    
+    public DbSet<Produto> Produtos { get; set; }
+    public DbSet<Categoria> Categorias { get; set; }
+    
+    protected override void OnModelCreating(DbModelBuilder construtor)
+    {
+        construtor.Entity<Produto>()
+            .HasRequired(p => p.Categoria)
+            .WithMany(c => c.Produtos)
+            .HasForeignKey(p => p.CategoriaId);
+    }
+}
+
+// Uso típico
+using (var contexto = new LojaContexto())
+{
+    var produtosAtivos = contexto.Produtos
+        .Where(p => p.Ativo)
+        .Include(p => p.Categoria)
+        .ToList();
+}
+
+// DEPOIS: .NET 10 - EF Core 8
+public class LojaContexto : DbContext
+{
+    public LojaContexto(DbContextOptions<LojaContexto> opcoes) 
+        : base(opcoes)
+    {
+    }
+    
+    public DbSet<Produto> Produtos => Set<Produto>();
+    public DbSet<Categoria> Categorias => Set<Categoria>();
+    
+    protected override void OnModelCreating(ModelBuilder construtor)
+    {
+        construtor.Entity<Produto>()
+            .HasOne(p => p.Categoria)
+            .WithMany(c => c.Produtos)
+            .HasForeignKey(p => p.CategoriaId)
+            .IsRequired();
+    }
+}
+
+// Configuração em Program.cs (Dependency Injection)
+builder.Services.AddDbContext<LojaContexto>(opcoes =>
+    opcoes.UseSqlServer(builder.Configuration.GetConnectionString("LojaDb"))
+          .EnableSensitiveDataLogging(builder.Environment.IsDevelopment())
+          .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)); // Performance
+
+// Uso com DI e async
+public class ProdutoServico(LojaContexto contexto)
+{
+    public async Task<List<Produto>> ObterProdutosAtivosAsync()
+    {
+        return await contexto.Produtos
+            .Where(p => p.Ativo)
+            .Include(p => p.Categoria)
+            .AsNoTracking() // Melhor performance para read-only
+            .ToListAsync();
+    }
+}
+```
+
+**Mudanças Críticas EF6 → EF Core:**
+
+| Feature EF6 | Equivalente EF Core 8 | Impacto |
+|-------------|----------------------|---------|
+| `HasRequired/HasOptional` | `HasOne(...).IsRequired()` | Syntax diferente |
+| `connection string em App.config` | DI via `AddDbContext` | Requer refatoração |
+| Lazy Loading padrão | Explícito via `UseLazyLoadingProxies()` | Muda comportamento |
+| `Database.Log = ...` | `LogTo()` ou ILogger integration | API diferente |
+| EDMX (Model First) | Removido - use Code First | Migração necessária |
+
+#### 2.2.4. Serialização e Configuração
+
+**De Newtonsoft.Json para System.Text.Json**
+
+```csharp
+// ANTES: .NET Framework 4.5 - Newtonsoft.Json
+using Newtonsoft.Json;
+
+var configuracao = new JsonSerializerSettings
+{
+    NullValueHandling = NullValueHandling.Ignore,
+    Formatting = Formatting.Indented,
+    ContractResolver = new CamelCasePropertyNamesContractResolver()
+};
+
+var jsonTexto = JsonConvert.SerializeObject(meuObjeto, configuracao);
+var objetoRecuperado = JsonConvert.DeserializeObject<MeuTipo>(jsonTexto);
+
+// DEPOIS: .NET 10 - System.Text.Json
+using System.Text.Json;
+
+var opcoes = new JsonSerializerOptions
+{
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    WriteIndented = true,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+};
+
+var jsonTexto = JsonSerializer.Serialize(meuObjeto, opcoes);
+var objetoRecuperado = JsonSerializer.Deserialize<MeuTipo>(jsonTexto, opcoes);
+```
+
+**Incompatibilidades e Soluções:**
+
+| Recurso Newtonsoft | System.Text.Json | Solução |
+|-------------------|------------------|---------|
+| `[JsonProperty("nome_customizado")]` | `[JsonPropertyName("nome_customizado")]` | Trocar atributos |
+| `TypeNameHandling` (polimorfismo) | Não suportado | Use discriminador manual ou mantenha Newtonsoft |
+| `PreserveReferencesHandling` | `ReferenceHandler.Preserve` | Configurar explicitamente |
+| Serialização de `DataTable` | Não suportado | Converta para classes POCO |
+
+---
+
 ### Passos práticos:
 
 #### 1. Avalie seu projeto:
