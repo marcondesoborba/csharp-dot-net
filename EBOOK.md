@@ -2270,6 +2270,427 @@ O arquivo `AssemblyInfo.cs` pode ser **deletado** - tudo é gerado automaticamen
 
 ---
 
+### 2.5. Padrões de Código Modernos
+
+O .NET 10 introduz novos padrões arquiteturais que devem ser adotados para aproveitar ao máximo a plataforma. Esta seção cobre os padrões essenciais.
+
+#### 2.5.1. Dependency Injection (DI) Nativa
+
+No .NET Framework 4.5, DI era opcional e geralmente usava bibliotecas de terceiros (Autofac, Unity, Ninject). No .NET 10, DI é **obrigatória** e integrada.
+
+**Padrão Antigo - Instanciação Manual:**
+
+```csharp
+// ANTES: .NET 4.5 - Sem DI, acoplamento alto
+public class PedidoController : Controller
+{
+    public ActionResult ProcessarPedido(int pedidoId)
+    {
+        // Criação manual de dependências (acoplamento)
+        var conexaoDb = new SqlConnection(ConfigurationManager.ConnectionStrings["DB"].ConnectionString);
+        var repositorio = new PedidoRepositorio(conexaoDb);
+        var servicoEmail = new EmailServico();
+        var servicoNotificacao = new NotificacaoServico(servicoEmail);
+        var processador = new ProcessadorPedido(repositorio, servicoNotificacao);
+        
+        var resultado = processador.Processar(pedidoId);
+        return View(resultado);
+    }
+}
+
+// Problemas: 
+// - Difícil testar (dependências reais)
+// - Gerenciamento de lifecycle manual
+// - Violação do princípio de inversão de dependência
+```
+
+**Padrão Moderno - DI Nativa:**
+
+```csharp
+// DEPOIS: .NET 10 - DI nativa
+// 1. Definir interfaces
+public interface IPedidoRepositorio
+{
+    Task<Pedido?> ObterPorIdAsync(int id);
+    Task SalvarAsync(Pedido pedido);
+}
+
+public interface INotificacaoServico
+{
+    Task EnviarConfirmacaoAsync(Pedido pedido);
+}
+
+// 2. Implementações
+public class PedidoRepositorio(AppDbContext contexto) : IPedidoRepositorio
+{
+    public async Task<Pedido?> ObterPorIdAsync(int id) =>
+        await contexto.Pedidos
+            .Include(p => p.Itens)
+            .FirstOrDefaultAsync(p => p.Id == id);
+            
+    public async Task SalvarAsync(Pedido pedido)
+    {
+        contexto.Pedidos.Update(pedido);
+        await contexto.SaveChangesAsync();
+    }
+}
+
+public class NotificacaoServico(IEmailServico emailServico, ILogger<NotificacaoServico> logger) 
+    : INotificacaoServico
+{
+    public async Task EnviarConfirmacaoAsync(Pedido pedido)
+    {
+        logger.LogInformation("Enviando confirmação para pedido {PedidoId}", pedido.Id);
+        await emailServico.EnviarAsync(pedido.ClienteEmail, "Confirmação", "Pedido confirmado!");
+    }
+}
+
+// 3. Controlador com injeção
+[ApiController]
+[Route("api/[controller]")]
+public class PedidosController(
+    IPedidoRepositorio repositorio,
+    INotificacaoServico notificacaoServico,
+    ILogger<PedidosController> logger) : ControllerBase
+{
+    [HttpPost("{id}/processar")]
+    public async Task<IActionResult> ProcessarPedido(int id)
+    {
+        var pedido = await repositorio.ObterPorIdAsync(id);
+        if (pedido is null) return NotFound();
+        
+        pedido.Status = StatusPedido.Processado;
+        await repositorio.SalvarAsync(pedido);
+        await notificacaoServico.EnviarConfirmacaoAsync(pedido);
+        
+        logger.LogInformation("Pedido {Id} processado com sucesso", id);
+        return Ok(pedido);
+    }
+}
+
+// 4. Registro no Program.cs
+builder.Services.AddDbContext<AppDbContext>(opts => 
+    opts.UseSqlServer(builder.Configuration.GetConnectionString("DB")));
+
+builder.Services.AddScoped<IPedidoRepositorio, PedidoRepositorio>();
+builder.Services.AddScoped<INotificacaoServico, NotificacaoServico>();
+builder.Services.AddTransient<IEmailServico, EmailServico>();
+```
+
+**Lifetimes de Serviço:**
+
+| Lifetime | Quando Usar | Exemplo |
+|----------|-------------|---------|
+| **Singleton** | Uma única instância para toda a aplicação | Configurações, caches compartilhados |
+| **Scoped** | Uma instância por requisição HTTP | DbContext, repositórios |
+| **Transient** | Nova instância toda vez | Serviços sem estado, factories |
+
+#### 2.5.2. Logging Estruturado
+
+Logging no .NET Framework era fragmentado (log4net, NLog, etc.). O .NET 10 tem logging integrado e estruturado.
+
+**Logging Antigo (log4net):**
+
+```csharp
+// ANTES: .NET 4.5 - log4net
+using log4net;
+
+public class ServicoProcessamento
+{
+    private static readonly ILog _log = LogManager.GetLogger(typeof(ServicoProcessamento));
+    
+    public void ProcessarDados(int usuarioId, string operacao)
+    {
+        _log.Info($"Iniciando processamento para usuário {usuarioId}, operação: {operacao}");
+        
+        try
+        {
+            // Processamento
+            _log.Debug($"Dados processados: {usuarioId}");
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Erro ao processar usuário {usuarioId}", ex);
+            throw;
+        }
+    }
+}
+
+// Problemas:
+// - Interpolação de strings consome CPU mesmo quando log está desabilitado
+// - Não estruturado (difícil consultar em ferramentas como Application Insights)
+// - Configuração via XML separado
+```
+
+**Logging Moderno (ILogger):**
+
+```csharp
+// DEPOIS: .NET 10 - ILogger estruturado
+using Microsoft.Extensions.Logging;
+
+public class ServicoProcessamento(ILogger<ServicoProcessamento> logger)
+{
+    public async Task ProcessarDadosAsync(int usuarioId, string operacao, CancellationToken ct)
+    {
+        // Logging estruturado - parâmetros são propriedades pesquisáveis
+        logger.LogInformation(
+            "Iniciando processamento para usuário {UsuarioId}, operação: {Operacao}",
+            usuarioId, operacao);
+        
+        try
+        {
+            await ExecutarProcessamentoAsync(usuarioId, ct);
+            
+            logger.LogDebug(
+                "Processamento concluído para {UsuarioId} em {Operacao}",
+                usuarioId, operacao);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // LogError com contexto estruturado
+            logger.LogError(ex,
+                "Falha no processamento: Usuário={UsuarioId}, Operacao={Operacao}",
+                usuarioId, operacao);
+            throw;
+        }
+    }
+    
+    private async Task ExecutarProcessamentoAsync(int usuarioId, CancellationToken ct)
+    {
+        // Simulação
+        await Task.Delay(100, ct);
+    }
+}
+
+// Configuração em appsettings.json
+/*
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "ServicoProcessamento": "Debug",
+      "Microsoft.EntityFrameworkCore": "Warning"
+    },
+    "Console": {
+      "FormatterName": "json"
+    }
+  }
+}
+*/
+```
+
+**Vantagens do ILogger:**
+- ⚡ Lazy evaluation - strings só são formatadas se o nível de log está habilitado
+- 📊 Estruturado - propriedades indexáveis em Application Insights/Elasticsearch
+- 🔌 Múltiplos providers simultaneamente (Console, File, Azure, etc.)
+- ⚙️ Configurável via JSON sem recompilação
+
+#### 2.5.3. Async/Await em Profundidade
+
+Async/await existe desde .NET 4.5, mas o uso evoluiu significativamente.
+
+**Anti-padrões Comuns (.NET 4.5):**
+
+```csharp
+// ❌ EVITAR: .NET 4.5 - Uso incorreto de async
+public class ServicoLegado
+{
+    // Anti-padrão 1: Sync-over-async (deadlock risk)
+    public List<Produto> ObterProdutos()
+    {
+        var tarefa = ObterProdutosAsync();
+        return tarefa.Result; // PERIGO: pode causar deadlock!
+    }
+    
+    // Anti-padrão 2: async void (exceto event handlers)
+    public async void SalvarDados(Produto produto)
+    {
+        await _repositorio.SalvarAsync(produto);
+        // Se exception aqui, aplicação pode crashar!
+    }
+    
+    // Anti-padrão 3: Não cancelável
+    public async Task ProcessarLote()
+    {
+        for (int i = 0; i < 1000; i++)
+        {
+            await ProcessarItemAsync(i);
+            // Não há como cancelar este loop!
+        }
+    }
+}
+```
+
+**Padrões Modernos (.NET 10):**
+
+```csharp
+// ✅ CORRETO: .NET 10 - Uso otimizado de async
+public class ServicoModerno(IProdutoRepositorio repositorio)
+{
+    // Padrão 1: Async até o fim (não bloquear)
+    public async Task<List<Produto>> ObterProdutosAsync(CancellationToken ct = default)
+    {
+        return await repositorio.ObterTodosAsync(ct);
+    }
+    
+    // Padrão 2: Retornar Task, não async void
+    public Task SalvarDadosAsync(Produto produto, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(produto);
+        return repositorio.SalvarAsync(produto, ct);
+    }
+    
+    // Padrão 3: Sempre suportar cancelamento
+    public async Task ProcessarLoteAsync(
+        IEnumerable<int> itens, 
+        CancellationToken ct = default)
+    {
+        foreach (var item in itens)
+        {
+            ct.ThrowIfCancellationRequested(); // Verifica cancelamento
+            await ProcessarItemAsync(item, ct);
+        }
+    }
+    
+    // Padrão 4: ValueTask para hot paths (performance)
+    public ValueTask<Produto?> ObterDoCacheAsync(int id)
+    {
+        // Se está em cache, retorna sync sem alocação de Task
+        if (_cache.TryGetValue(id, out var produto))
+            return ValueTask.FromResult(produto);
+            
+        // Se não está, busca async
+        return new ValueTask<Produto?>(BuscarDoBancoAsync(id));
+    }
+    
+    private readonly Dictionary<int, Produto> _cache = new();
+    
+    private async Task<Produto?> BuscarDoBancoAsync(int id)
+    {
+        var produto = await repositorio.ObterPorIdAsync(id);
+        if (produto is not null)
+            _cache[id] = produto;
+        return produto;
+    }
+}
+```
+
+**Regras de Ouro para Async:**
+
+```plaintext
+┌──────────────────────────────────────────────────┐
+│ 1. Async até o fim - nunca .Result ou .Wait()   │
+│ 2. Sempre Task<T>, nunca async void             │
+│ 3. Sempre aceitar CancellationToken             │
+│ 4. Use ValueTask<T> para hot paths              │
+│ 5. Configure ConfigureAwait(false) em libraries │
+└──────────────────────────────────────────────────┘
+```
+
+#### 2.5.4. Tratamento de Erros Moderno
+
+**Abordagem Antiga:**
+
+```csharp
+// ANTES: .NET 4.5 - Try/catch genérico
+public ActionResult ProcessarPedido(int id)
+{
+    try
+    {
+        var pedido = _repositorio.Obter(id);
+        _processador.Processar(pedido);
+        return View("Sucesso");
+    }
+    catch (Exception ex)
+    {
+        _log.Error("Erro", ex);
+        return View("Erro");
+    }
+}
+```
+
+**Abordagem Moderna - Middleware de Exceções:**
+
+```csharp
+// DEPOIS: .NET 10 - Exception handling centralizado
+
+// 1. Middleware global
+public class TratadorExcecoesGlobal(RequestDelegate proximo, ILogger<TratadorExcecoesGlobal> logger)
+{
+    public async Task InvokeAsync(HttpContext contexto)
+    {
+        try
+        {
+            await proximo(contexto);
+        }
+        catch (DomainException ex)
+        {
+            logger.LogWarning(ex, "Erro de domínio: {Mensagem}", ex.Message);
+            await EscreverRespostaErroAsync(contexto, StatusCodes.Status400BadRequest, ex.Message);
+        }
+        catch (NotFoundException ex)
+        {
+            logger.LogInformation(ex, "Recurso não encontrado: {Mensagem}", ex.Message);
+            await EscreverRespostaErroAsync(contexto, StatusCodes.Status404NotFound, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Erro não tratado: {Mensagem}", ex.Message);
+            await EscreverRespostaErroAsync(contexto, StatusCodes.Status500InternalServerError, 
+                "Erro interno do servidor");
+        }
+    }
+    
+    private static async Task EscreverRespostaErroAsync(HttpContext ctx, int statusCode, string mensagem)
+    {
+        ctx.Response.StatusCode = statusCode;
+        ctx.Response.ContentType = "application/json";
+        
+        var resposta = new { erro = mensagem, timestamp = DateTime.UtcNow };
+        await ctx.Response.WriteAsJsonAsync(resposta);
+    }
+}
+
+// 2. Exceções específicas de domínio
+public class DomainException : Exception
+{
+    public DomainException(string mensagem) : base(mensagem) { }
+}
+
+public class NotFoundException : Exception
+{
+    public NotFoundException(string entidade, object chave) 
+        : base($"{entidade} com chave {chave} não encontrado") { }
+}
+
+// 3. Controlador limpo
+[ApiController]
+[Route("api/[controller]")]
+public class PedidosController(IPedidoRepositorio repositorio) : ControllerBase
+{
+    [HttpPost("{id}/processar")]
+    public async Task<IActionResult> ProcessarPedido(int id)
+    {
+        // Não precisa try/catch - middleware cuida
+        var pedido = await repositorio.ObterPorIdAsync(id) 
+            ?? throw new NotFoundException("Pedido", id);
+            
+        if (pedido.Status != StatusPedido.Pendente)
+            throw new DomainException("Pedido já foi processado");
+            
+        pedido.Processar();
+        await repositorio.SalvarAsync(pedido);
+        
+        return Ok(pedido);
+    }
+}
+
+// 4. Registrar no Program.cs
+app.UseMiddleware<TratadorExcecoesGlobal>();
+```
+
+---
+
 ### Passos práticos:
 
 #### 1. Avalie seu projeto:
