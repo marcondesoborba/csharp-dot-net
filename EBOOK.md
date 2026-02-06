@@ -1943,6 +1943,333 @@ protected void btnCalcular_Click(object sender, EventArgs e)
 
 ---
 
+### 2.4. Passo a Passo da Atualização de Projeto
+
+Esta seção detalha o processo técnico de converter um projeto .NET Framework 4.5 para .NET 10, incluindo modificações em arquivos de projeto, gerenciamento de dependências e ajustes de código.
+
+#### 2.4.1. Conversão do Arquivo de Projeto (.csproj)
+
+O formato de projeto mudou drasticamente do antigo XML verboso para o SDK-style moderno.
+
+**Arquivo Original (.NET Framework 4.5):**
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" 
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+  
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>MinhaEmpresa.SistemaVendas</RootNamespace>
+    <AssemblyName>MinhaEmpresa.SistemaVendas</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="EntityFramework, Version=6.0.0.0">
+      <HintPath>..\packages\EntityFramework.6.4.4\lib\net45\EntityFramework.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Compile Include="Modelos\Produto.cs" />
+    <Compile Include="Modelos\Cliente.cs" />
+    <Compile Include="Repositorios\ProdutoRepositorio.cs" />
+    <Compile Include="Servicos\VendaServico.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
+```
+
+**Arquivo Modernizado (.NET 10):**
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MinhaEmpresa.SistemaVendas</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>14</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>
+```
+
+**Redução de Complexidade:**
+- De ~50 linhas para ~15 linhas (redução de 70%)
+- Inclusão automática de arquivos .cs (não precisa listar um por um)
+- Referências via NuGet moderno (não mais packages.config)
+- Configurações simplificadas
+
+#### 2.4.2. Migração de Pacotes NuGet
+
+**Formato Antigo (packages.config):**
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<packages>
+  <package id="EntityFramework" version="6.4.4" targetFramework="net45" />
+  <package id="Newtonsoft.Json" version="12.0.3" targetFramework="net45" />
+  <package id="log4net" version="2.0.12" targetFramework="net45" />
+  <package id="AutoMapper" version="9.0.0" targetFramework="net45" />
+</packages>
+```
+
+**Formato Moderno (PackageReference no .csproj):**
+
+Já incluído no exemplo acima - integrado ao próprio arquivo de projeto.
+
+**Script PowerShell para Converter Pacotes Automaticamente:**
+
+```powershell
+# ConvertePacotes.ps1 - Converte packages.config para PackageReference
+
+param([string]$CaminhoProjeto = ".")
+
+$packagesConfig = Join-Path $CaminhoProjeto "packages.config"
+
+if (-not (Test-Path $packagesConfig)) {
+    Write-Host "Arquivo packages.config não encontrado!" -ForegroundColor Red
+    exit 1
+}
+
+[xml]$pacotes = Get-Content $packagesConfig
+
+$mapeamento = @{
+    "EntityFramework" = "Microsoft.EntityFrameworkCore.SqlServer"
+    "Newtonsoft.Json" = "System.Text.Json"  # Considera migrar
+    "log4net" = "Microsoft.Extensions.Logging"
+    "AutoMapper" = "AutoMapper"  # Compatível
+}
+
+Write-Host "`n<ItemGroup>" -ForegroundColor Green
+
+foreach ($pacote in $pacotes.packages.package) {
+    $nomeNovo = if ($mapeamento[$pacote.id]) { 
+        $mapeamento[$pacote.id] 
+    } else { 
+        $pacote.id 
+    }
+    
+    Write-Host "  <PackageReference Include=`"$nomeNovo`" Version=`"$($pacote.version)`" />"
+}
+
+Write-Host "</ItemGroup>`n" -ForegroundColor Green
+```
+
+#### 2.4.3. Atualização de Namespaces e Imports
+
+Muitos namespaces foram reorganizados ou renomeados:
+
+```csharp
+// ANTES: .NET Framework 4.5
+using System.Web.Mvc;              // Controllers MVC
+using System.Web.Http;             // Web API
+using System.Data.Entity;          // Entity Framework 6
+using Newtonsoft.Json;             // JSON serialization
+using System.Configuration;        // App.config
+
+// DEPOIS: .NET 10
+using Microsoft.AspNetCore.Mvc;    // Controllers unificados
+using Microsoft.EntityFrameworkCore;  // EF Core
+using System.Text.Json;            // JSON nativo
+using Microsoft.Extensions.Configuration;  // appsettings.json
+```
+
+**Tabela de Conversão de Namespaces Comuns:**
+
+| .NET 4.5 | .NET 10 | Notas |
+|----------|---------|-------|
+| `System.Web.Mvc` | `Microsoft.AspNetCore.Mvc` | MVC unificado |
+| `System.Web.Http` | `Microsoft.AspNetCore.Mvc` | Web API integrado |
+| `System.Data.Entity` | `Microsoft.EntityFrameworkCore` | EF Core |
+| `System.Configuration` | `Microsoft.Extensions.Configuration` | appsettings.json |
+| `System.Web.Security` | `Microsoft.AspNetCore.Identity` | Autenticação moderna |
+
+#### 2.4.4. Migração de Configuração (App.config → appsettings.json)
+
+**Configuração Antiga (App.config / Web.config):**
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <appSettings>
+    <add key="EmailRemetente" value="sistema@empresa.com" />
+    <add key="TempoMaximoProcessamento" value="300" />
+    <add key="AmbienteProducao" value="false" />
+  </appSettings>
+  
+  <connectionStrings>
+    <add name="BancoPrincipal" 
+         connectionString="Server=localhost;Database=Vendas;User Id=sa;Password=123456;" 
+         providerName="System.Data.SqlClient" />
+  </connectionStrings>
+</configuration>
+```
+
+**Configuração Moderna (appsettings.json):**
+
+```json
+{
+  "EmailConfig": {
+    "Remetente": "sistema@empresa.com",
+    "ServidorSmtp": "smtp.empresa.com",
+    "PortaSmtp": 587
+  },
+  "ProcessamentoConfig": {
+    "TempoMaximoSegundos": 300,
+    "TentativasMaximas": 3
+  },
+  "AmbienteProducao": false,
+  "ConnectionStrings": {
+    "BancoPrincipal": "Server=localhost;Database=Vendas;User Id=sa;Password=123456;TrustServerCertificate=True"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+```
+
+**Acesso às Configurações - Antes e Depois:**
+
+```csharp
+// ANTES: .NET 4.5 - ConfigurationManager
+using System.Configuration;
+
+public class ProcessadorPedidos
+{
+    private readonly string emailRemetente;
+    private readonly int tempoMaximo;
+    
+    public ProcessadorPedidos()
+    {
+        emailRemetente = ConfigurationManager.AppSettings["EmailRemetente"];
+        tempoMaximo = int.Parse(ConfigurationManager.AppSettings["TempoMaximoProcessamento"]);
+    }
+}
+
+// DEPOIS: .NET 10 - IOptions<T> pattern
+using Microsoft.Extensions.Options;
+
+public record EmailConfig(string Remetente, string ServidorSmtp, int PortaSmtp);
+public record ProcessamentoConfig(int TempoMaximoSegundos, int TentativasMaximas);
+
+public class ProcessadorPedidos
+{
+    private readonly EmailConfig _emailConfig;
+    private readonly ProcessamentoConfig _processamentoConfig;
+    
+    // Injeção de dependência com primary constructor (C# 12+)
+    public ProcessadorPedidos(
+        IOptions<EmailConfig> emailOptions,
+        IOptions<ProcessamentoConfig> processamentoOptions)
+    {
+        _emailConfig = emailOptions.Value;
+        _processamentoConfig = processamentoOptions.Value;
+    }
+    
+    public async Task ProcessarAsync()
+    {
+        // Usar _emailConfig.Remetente, etc.
+    }
+}
+
+// Registrar no Program.cs
+builder.Services.Configure<EmailConfig>(
+    builder.Configuration.GetSection("EmailConfig"));
+builder.Services.Configure<ProcessamentoConfig>(
+    builder.Configuration.GetSection("ProcessamentoConfig"));
+```
+
+**Vantagens da Nova Abordagem:**
+- ✅ Tipo-seguro (erros em compile-time, não runtime)
+- ✅ Testável (mock IOptions facilmente)
+- ✅ Hierarquia natural (objetos JSON aninhados)
+- ✅ Múltiplos provedores (JSON, variáveis ambiente, Azure Key Vault, etc.)
+
+#### 2.4.5. Migração de AssemblyInfo.cs
+
+No .NET Framework, metadados do assembly ficavam em `Properties/AssemblyInfo.cs`:
+
+```csharp
+// ANTES: Properties/AssemblyInfo.cs (.NET 4.5)
+using System.Reflection;
+using System.Runtime.InteropServices;
+
+[assembly: AssemblyTitle("Sistema de Vendas")]
+[assembly: AssemblyDescription("Sistema completo de gestão de vendas")]
+[assembly: AssemblyCompany("Minha Empresa LTDA")]
+[assembly: AssemblyProduct("SistemaVendas")]
+[assembly: AssemblyCopyright("Copyright © 2020-2025")]
+[assembly: AssemblyVersion("2.5.0.0")]
+[assembly: AssemblyFileVersion("2.5.0.0")]
+[assembly: ComVisible(false)]
+[assembly: Guid("a1b2c3d4-e5f6-7890-abcd-ef1234567890")]
+```
+
+**DEPOIS: Tudo no .csproj (.NET 10):**
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>SistemaVendas</AssemblyName>
+    <RootNamespace>MinhaEmpresa.SistemaVendas</RootNamespace>
+    
+    <!-- Metadados agora aqui -->
+    <AssemblyTitle>Sistema de Vendas</AssemblyTitle>
+    <Description>Sistema completo de gestão de vendas</Description>
+    <Company>Minha Empresa LTDA</Company>
+    <Product>SistemaVendas</Product>
+    <Copyright>Copyright © 2020-2025</Copyright>
+    <Version>2.5.0</Version>
+    
+    <!-- Geração automática de AssemblyInfo -->
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+</Project>
+```
+
+O arquivo `AssemblyInfo.cs` pode ser **deletado** - tudo é gerado automaticamente!
+
+---
+
 ### Passos práticos:
 
 #### 1. Avalie seu projeto:
