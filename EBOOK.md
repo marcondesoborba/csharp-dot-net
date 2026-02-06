@@ -3672,6 +3672,8 @@ if (!sucesso)
 #### 2. Out Variables
 
 ```csharp
+string texto = "123";
+
 // ❌ C# 5 - Declaração separada
 int resultado;
 if (int.TryParse(texto, out resultado))
@@ -3696,7 +3698,7 @@ if (int.TryParse(texto, out _))
 
 ```csharp
 // ❌ C# 5 - Casting manual
-object obj = ObterObjeto();
+object obj = ObterDados(); // Retorna string, int, ou outro tipo
 if (obj is string)
 {
     string texto = (string)obj;
@@ -4722,8 +4724,8 @@ cliente?.UltimoAcesso = DateTime.Now;
 #### 4. nameof para Tipos Genéricos
 
 ```csharp
-// ✅ C# 14 - nameof com tipos genéricos
-Console.WriteLine(nameof(List<int>)); // "List" (antes era erro)
+// ✅ C# 14 - nameof com tipos genéricos (novidade do C# 14)
+Console.WriteLine(nameof(List<int>)); // "List" (erro antes do C# 14)
 Console.WriteLine(nameof(Dictionary<,>)); // "Dictionary"
 
 // Útil em logging e exceptions
@@ -4734,11 +4736,15 @@ throw new InvalidOperationException(
 #### 5. Lambda Improvements Finais
 
 ```csharp
-// ✅ C# 14 - Lambda com out parameters sem tipo explícito
-var parser = (text, out result) => int.TryParse(text, out result);
+// ✅ C# 14 - Inferência de tipo melhorada em lambdas
+var processar = (string texto) => 
+{
+    int.TryParse(texto, out var resultado);
+    return resultado;
+};
 
-// ✅ C# 14 - Partial para lambdas
-partial Func<int, int> ProcessarNumero = x => x * 2;
+// ✅ C# 14 - Natural type para lambdas
+var calcular = (int x, int y) => x + y; // Tipo: Func<int, int, int>
 ```
 
 **Checklist de Migração C# 14**:
