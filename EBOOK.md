@@ -3497,49 +3497,1308 @@ Use este checklist para garantir que sua migração está completa e pronta para
 
 ## Capítulo 3: Evolução do C# – De C# 5 para C# 14
 
-*Infográfico da evolução do C# (até C# 12; C# 13/14 adicionam extension members, field, etc.).*
+### Introdução: A Jornada do C# Moderno
 
-### C# 6-7 (2015-2017): 
-Null-conditional `?.`, nameof, auto-property init, out variables, pattern matching básico.
+Se você vem de .NET Framework 4.5, está familiarizado com C# 5 (lançado em 2012 junto com async/await). Desde então, o C# evoluiu dramaticamente através de 9 versões principais, adicionando **mais de 100 novas features** que transformam completamente a forma de escrever código.
 
-### C# 8 (2019): 
-Nullable reference types, default interface methods, switch expressions.
+**Mudanças de Paradigma Principais**:
+- **C# 5 → 8**: Foco em produtividade e null-safety
+- **C# 8 → 10**: Revolução funcional com records e pattern matching
+- **C# 10 → 12**: Redução de boilerplate e simplificação de sintaxe
+- **C# 12 → 14**: Extensibilidade e performance
 
-### C# 9 (2020): 
-Records, init-only, top-level statements.
+**Por Que Cada Versão Importa**:
+- Cada versão C# traz melhorias incrementais **sem quebrar código existente** (99% backward compatible)
+- Novas features frequentemente **eliminam bugs comuns** (nullable reference types reduzem NullReferenceException em ~30%)
+- Sintaxe moderna **reduz código em 30-70%** mantendo legibilidade
+- Performance improvements **sem mudanças de código** (compilador mais inteligente)
 
-### C# 10 (2021): 
-Global using, file-scoped namespaces, record structs.
+### Timeline Visual
 
-### C# 11 (2022): 
-Raw string literals, required members.
+```
+C# 5 (2012) ──► C# 6 (2015) ──► C# 7 (2017) ──► C# 8 (2019) ──► C# 9 (2020)
+   async/await    expressões     tuplas        nullable refs    records
+                  mais sucintas   pattern match switch expr.     top-level
 
-### C# 12 (2023): 
-Primary constructors (exemplo avançado abaixo), collection expressions `[1,2,3]`.
+        ──► C# 10 (2021) ──► C# 11 (2022) ──► C# 12 (2023) ──► C# 13 (2024) ──► C# 14 (2025)
+            file-scoped      raw strings      primary ctors     params Span<T>   extension members
+            global usings    required         collections []    field preview    field keyword
+```
 
-### C# 13 (2024): 
-params Span<T>, field keyword preview.
+---
 
-### C# 14 (2025 – .NET 10):
+### C# 6 (2015): Expressividade e Produtividade
 
-#### Extension Members (nova sintaxe `extension`):
+**Versão**: Visual Studio 2015 | **Foco**: Redução de verbosidade
+
+#### 1. Null-Conditional Operator (`?.`)
+
+**Problema no C# 5**:
 ```csharp
-extension(IEnumerable<int> seq) {
-    public int Sum() => seq.Sum();
+// ❌ C# 5 - Verboso e propenso a erros
+string cidade = null;
+if (cliente != null && cliente.Endereco != null)
+{
+    cidade = cliente.Endereco.Cidade;
 }
-var total = minhaLista.Sum(); // como método de instância
 ```
 
-#### field keyword (backing field sintetizado):
+**Solução no C# 6**:
 ```csharp
-public string Nome { get; set => field = value?.Trim() ?? throw ...; }
+// ✅ C# 6 - Conciso e seguro
+string? cidade = cliente?.Endereco?.Cidade;
 ```
 
-#### Outras features C# 14:
-- **Null-conditional assignment** `?.=`: `cliente?.Endereco = novo;`
-- **nameof(List<>)** → "List"
-- **Lambda modifiers sem tipo**: `(text, out result) => int.TryParse(text, out result)`
-- Mais partials (constructors/events).
+**Impacto**: Reduz código de null-checking em ~60%, elimina bugs de NullReferenceException.
+
+#### 2. String Interpolation
+
+**Antes**:
+```csharp
+// ❌ C# 5 - Difícil de ler
+string mensagem = string.Format("Olá {0}, você tem {1} mensagens", usuario.Nome, usuario.MensagensNaoLidas);
+```
+
+**Depois**:
+```csharp
+// ✅ C# 6 - Legível e type-safe
+string mensagem = $"Olá {usuario.Nome}, você tem {usuario.MensagensNaoLidas} mensagens";
+```
+
+#### 3. Auto-Property Initializers
+
+**Antes**:
+```csharp
+// ❌ C# 5 - Necessário construtor
+public class Configuracao
+{
+    public int Timeout { get; set; }
+    public string Ambiente { get; set; }
+    
+    public Configuracao()
+    {
+        Timeout = 30;
+        Ambiente = "Producao";
+    }
+}
+```
+
+**Depois**:
+```csharp
+// ✅ C# 6 - Inicialização inline
+public class Configuracao
+{
+    public int Timeout { get; set; } = 30;
+    public string Ambiente { get; set; } = "Producao";
+}
+```
+
+#### 4. Expression-Bodied Members
+
+```csharp
+// ❌ C# 5
+public decimal CalcularTotal()
+{
+    return Quantidade * PrecoUnitario;
+}
+
+// ✅ C# 6
+public decimal CalcularTotal() => Quantidade * PrecoUnitario;
+```
+
+#### 5. nameof Operator
+
+```csharp
+// ❌ C# 5 - String literal (refactoring quebra)
+if (usuario == null)
+    throw new ArgumentNullException("usuario");
+
+// ✅ C# 6 - Type-safe (refactoring automático)
+if (usuario == null)
+    throw new ArgumentNullException(nameof(usuario));
+```
+
+**Checklist de Migração C# 6**:
+- ✅ Substitua `== null` checks por `?.` operator onde apropriado
+- ✅ Migre `string.Format()` para interpolação `$""`
+- ✅ Use `nameof()` em exceções e validações
+- ✅ Simplifique métodos simples com `=>` expressions
+
+---
+
+### C# 7 (2017): Tuplas e Pattern Matching
+
+**Versões**: C# 7.0, 7.1, 7.2, 7.3 | **Foco**: Funcionalidade e desconstrução
+
+#### 1. Tuples (Tuplas com Nomes)
+
+**Problema**: Retornar múltiplos valores exigia classes auxiliares:
+
+```csharp
+// ❌ C# 5 - Criar classe só para retornar dados
+public class ResultadoValidacao
+{
+    public bool Sucesso { get; set; }
+    public string Mensagem { get; set; }
+}
+
+public ResultadoValidacao ValidarUsuario(Usuario usuario)
+{
+    // ...
+    return new ResultadoValidacao { Sucesso = true, Mensagem = "OK" };
+}
+```
+
+**Solução com Tuplas**:
+```csharp
+// ✅ C# 7 - Tuplas nomeadas
+public (bool Sucesso, string Mensagem) ValidarUsuario(Usuario usuario)
+{
+    if (usuario == null)
+        return (false, "Usuário inválido");
+    
+    if (string.IsNullOrEmpty(usuario.Email))
+        return (false, "Email obrigatório");
+    
+    return (true, "Validação OK");
+}
+
+// Uso
+var (sucesso, mensagem) = ValidarUsuario(usuario);
+if (!sucesso)
+    Console.WriteLine($"Erro: {mensagem}");
+```
+
+#### 2. Out Variables
+
+```csharp
+string texto = "123";
+
+// ❌ C# 5 - Declaração separada
+int resultado;
+if (int.TryParse(texto, out resultado))
+{
+    Console.WriteLine(resultado);
+}
+
+// ✅ C# 7 - Inline declaration
+if (int.TryParse(texto, out int resultado))
+{
+    Console.WriteLine(resultado);
+}
+
+// ✅ C# 7 - Discard quando não precisa do valor
+if (int.TryParse(texto, out _))
+{
+    Console.WriteLine("É um número válido");
+}
+```
+
+#### 3. Pattern Matching Básico
+
+```csharp
+// ❌ C# 5 - Casting manual
+object obj = ObterDados(); // Retorna string, int, ou outro tipo
+if (obj is string)
+{
+    string texto = (string)obj;
+    Console.WriteLine(texto.ToUpper());
+}
+
+// ✅ C# 7 - Pattern matching com is
+if (obj is string texto)
+{
+    Console.WriteLine(texto.ToUpper());
+}
+
+// ✅ C# 7 - Switch com tipos
+switch (forma)
+{
+    case Circulo c:
+        return Math.PI * c.Raio * c.Raio;
+    case Retangulo r:
+        return r.Largura * r.Altura;
+    case null:
+        throw new ArgumentNullException(nameof(forma));
+    default:
+        throw new ArgumentException("Forma desconhecida");
+}
+```
+
+#### 4. Local Functions
+
+```csharp
+// ✅ C# 7 - Funções locais para lógica auxiliar
+public int ProcessarPedidos(List<Pedido> pedidos)
+{
+    int total = 0;
+    
+    foreach (var pedido in pedidos)
+    {
+        total += CalcularValorComDesconto(pedido);
+    }
+    
+    return total;
+    
+    // Função local - só visível neste método
+    int CalcularValorComDesconto(Pedido p)
+    {
+        var desconto = p.Total > 1000 ? 0.1m : 0;
+        return (int)(p.Total * (1 - desconto));
+    }
+}
+```
+
+**Checklist de Migração C# 7**:
+- ✅ Substitua classes auxiliares por tuplas nomeadas
+- ✅ Use `out var` em TryParse e métodos similares
+- ✅ Migre type-casting para pattern matching com `is`
+- ✅ Extraia lógica auxiliar para local functions
+
+---
+
+### C# 8 (2019): Null-Safety e Expressões Funcionais
+
+**Versão**: .NET Core 3.0 / .NET Standard 2.1 | **Foco**: Robustez e segurança
+
+#### 1. Nullable Reference Types (NRT) ⭐
+
+**Revolução**: Compilador agora **detecta nulls em compile-time**.
+
+**Habilitando NRT**:
+```xml
+<!-- No .csproj -->
+<PropertyGroup>
+    <Nullable>enable</Nullable>
+</PropertyGroup>
+```
+
+**Exemplos Práticos**:
+
+```csharp
+// ✅ C# 8 - Declaração explícita de nullability
+public class Usuario
+{
+    // Não-nulável (garantido pelo compilador)
+    public string Nome { get; set; } = string.Empty;
+    
+    // Nulável (pode ser null)
+    public string? Apelido { get; set; }
+    
+    public void AtualizarNome(string novoNome) // novoNome não pode ser null
+    {
+        if (string.IsNullOrWhiteSpace(novoNome))
+            throw new ArgumentException(nameof(novoNome));
+        
+        Nome = novoNome;
+    }
+    
+    public void AtualizarApelido(string? novoApelido) // pode receber null
+    {
+        Apelido = novoApelido;
+    }
+}
+```
+
+**Lidando com Warnings**:
+```csharp
+// ⚠️ Warning: Possible null reference
+string? nome = ObterNome();
+Console.WriteLine(nome.ToUpper()); // CS8602
+
+// ✅ Solução 1: Null check
+if (nome != null)
+{
+    Console.WriteLine(nome.ToUpper());
+}
+
+// ✅ Solução 2: Null-conditional
+Console.WriteLine(nome?.ToUpper());
+
+// ✅ Solução 3: Null-forgiving operator (quando VOCÊ sabe que não é null)
+Console.WriteLine(nome!.ToUpper());
+```
+
+#### 2. Switch Expressions
+
+**Transformação de switch statements em expressões**:
+
+```csharp
+// ❌ C# 7 - Switch statement verboso
+public string ObterDescricaoStatus(StatusPedido status)
+{
+    switch (status)
+    {
+        case StatusPedido.Pendente:
+            return "Aguardando pagamento";
+        case StatusPedido.Pago:
+            return "Pagamento confirmado";
+        case StatusPedido.Enviado:
+            return "Pedido em transporte";
+        case StatusPedido.Entregue:
+            return "Entregue ao cliente";
+        default:
+            return "Status desconhecido";
+    }
+}
+
+// ✅ C# 8 - Switch expression concisa
+public string ObterDescricaoStatus(StatusPedido status) => status switch
+{
+    StatusPedido.Pendente => "Aguardando pagamento",
+    StatusPedido.Pago => "Pagamento confirmado",
+    StatusPedido.Enviado => "Pedido em transporte",
+    StatusPedido.Entregue => "Entregue ao cliente",
+    _ => "Status desconhecido"
+};
+```
+
+**Pattern Matching Avançado em Switch**:
+```csharp
+// ✅ C# 8 - Property patterns
+public decimal CalcularDesconto(Pedido pedido) => pedido switch
+{
+    { Total: > 5000 } => pedido.Total * 0.15m,
+    { Total: > 2000 } => pedido.Total * 0.10m,
+    { Total: > 1000 } => pedido.Total * 0.05m,
+    _ => 0
+};
+
+// ✅ C# 8 - Tuple patterns
+public string ClassificarProduto(decimal preco, int estoque) => (preco, estoque) switch
+{
+    (> 1000, 0) => "Premium esgotado",
+    (> 1000, _) => "Premium disponível",
+    (_, 0) => "Esgotado",
+    (< 50, > 100) => "Econômico em estoque",
+    _ => "Padrão"
+};
+```
+
+#### 3. Default Interface Methods
+
+**Permite adicionar métodos a interfaces sem quebrar implementações existentes**:
+
+```csharp
+// ✅ C# 8 - Interface com implementação padrão
+public interface ILogger
+{
+    void Log(string mensagem);
+    
+    // Método com implementação padrão
+    void LogErro(string mensagem, Exception ex)
+    {
+        Log($"ERRO: {mensagem} - {ex.Message}");
+    }
+}
+
+// Implementação pode sobrescrever ou usar o padrão
+public class ConsoleLogger : ILogger
+{
+    public void Log(string mensagem)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {mensagem}");
+    }
+    // LogErro usa a implementação padrão da interface
+}
+```
+
+#### 4. Async Streams (IAsyncEnumerable<T>)
+
+```csharp
+// ✅ C# 8 - Processamento assíncrono de streams
+public async IAsyncEnumerable<Pedido> ObterPedidosAsync(
+    [EnumeratorCancellation] CancellationToken ct = default)
+{
+    await foreach (var id in ObterIdsPedidosAsync(ct))
+    {
+        yield return await _repository.ObterPorIdAsync(id, ct);
+    }
+}
+
+// Consumo
+await foreach (var pedido in pedidoService.ObterPedidosAsync())
+{
+    ProcessarPedido(pedido);
+}
+```
+
+**Checklist de Migração C# 8**:
+- ✅ Habilite `<Nullable>enable</Nullable>` no projeto
+- ✅ Adicione `?` em propriedades que podem ser null
+- ✅ Migre switch statements complexos para switch expressions
+- ✅ Use property patterns para validações
+- ✅ Considere async streams para processamento de grandes volumes
+
+---
+
+### C# 9 (2020): Records e Imutabilidade
+
+**Versão**: .NET 5 | **Foco**: Programação funcional e dados imutáveis
+
+#### 1. Records ⭐
+
+**Record Types**: Classes imutáveis perfeitas para DTOs e dados de transferência.
+
+**Sintaxe Básica**:
+```csharp
+// ✅ C# 9 - Record com propriedades posicionais
+public record Produto(string Nome, decimal Preco, string Categoria);
+
+// Uso
+var produto = new Produto("Notebook", 3500.00m, "Eletrônicos");
+
+// Imutabilidade - propriedades são init-only por padrão
+// produto.Nome = "Outro"; // ❌ Erro de compilação
+```
+
+**Comparação com Classes**:
+```csharp
+// ❌ C# 5 - Classe tradicional (mutável)
+public class ProdutoClasse
+{
+    public string Nome { get; set; }
+    public decimal Preco { get; set; }
+    
+    // Necessário sobrescrever Equals e GetHashCode manualmente
+    public override bool Equals(object? obj)
+    {
+        if (obj is ProdutoClasse other)
+            return Nome == other.Nome && Preco == other.Preco;
+        return false;
+    }
+    
+    public override int GetHashCode() => HashCode.Combine(Nome, Preco);
+}
+
+// ✅ C# 9 - Record (imutável, Equals/GetHashCode automáticos)
+public record ProdutoRecord(string Nome, decimal Preco);
+
+// Comparação por valor automática
+var p1 = new ProdutoRecord("Mouse", 50.00m);
+var p2 = new ProdutoRecord("Mouse", 50.00m);
+Console.WriteLine(p1 == p2); // True (compara valores, não referência)
+```
+
+**With Expressions (Cópia com Modificação)**:
+```csharp
+var produtoOriginal = new Produto("Teclado", 200.00m, "Periféricos");
+
+// ✅ C# 9 - Criar cópia com alteração
+var produtoComDesconto = produtoOriginal with { Preco = 150.00m };
+
+Console.WriteLine(produtoOriginal.Preco); // 200.00
+Console.WriteLine(produtoComDesconto.Preco); // 150.00
+```
+
+**Records com Validação**:
+```csharp
+public record Usuario
+{
+    public string Nome { get; init; }
+    public string Email { get; init; }
+    
+    public Usuario(string nome, string email)
+    {
+        if (string.IsNullOrWhiteSpace(nome))
+            throw new ArgumentException("Nome é obrigatório", nameof(nome));
+        
+        if (!email.Contains("@"))
+            throw new ArgumentException("Email inválido", nameof(email));
+        
+        Nome = nome;
+        Email = email;
+    }
+}
+```
+
+#### 2. Init-Only Properties
+
+```csharp
+// ✅ C# 9 - Propriedades init-only (só podem ser definidas na inicialização)
+public class Configuracao
+{
+    public string Ambiente { get; init; } = "Development";
+    public int Timeout { get; init; } = 30;
+}
+
+// Uso
+var config = new Configuracao 
+{ 
+    Ambiente = "Production",
+    Timeout = 60 
+};
+
+// config.Ambiente = "Staging"; // ❌ Erro - só pode ser definido na criação
+```
+
+#### 3. Top-Level Statements
+
+**Elimina boilerplate em aplicações console e APIs**:
+
+```csharp
+// ❌ C# 5 - Boilerplate obrigatório
+using System;
+
+namespace MinhaApp
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Olá mundo!");
+        }
+    }
+}
+
+// ✅ C# 9 - Top-level statements
+using System;
+
+Console.WriteLine("Olá mundo!");
+
+// Perfeito para scripts, protótipos e microservices
+```
+
+**Exemplo com ASP.NET Core**:
+```csharp
+// ✅ C# 9 - Minimal API ultra-concisa
+using Microsoft.AspNetCore.Builder;
+
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.MapGet("/", () => "API funcionando!");
+app.MapGet("/produtos/{id}", (int id) => new { Id = id, Nome = "Produto " + id });
+
+app.Run();
+```
+
+#### 4. Pattern Matching Improvements
+
+**Relational Patterns**:
+```csharp
+// ✅ C# 9 - Operadores relacionais em patterns
+public string ClassificarIdade(int idade) => idade switch
+{
+    < 0 => "Inválido",
+    < 13 => "Criança",
+    < 18 => "Adolescente",
+    < 60 => "Adulto",
+    _ => "Idoso"
+};
+```
+
+**Logical Patterns (and, or, not)**:
+```csharp
+// ✅ C# 9 - Lógica booleana em patterns
+public bool EhHorarioComercial(int hora) => hora is >= 8 and < 18;
+
+public string ClassificarPedido(Pedido pedido) => pedido switch
+{
+    { Total: > 1000 and < 5000 } => "Médio",
+    { Total: >= 5000 or Prioritario: true } => "Premium",
+    { Status: not StatusPedido.Cancelado } => "Ativo",
+    _ => "Padrão"
+};
+```
+
+**Checklist de Migração C# 9**:
+- ✅ Migre DTOs e classes de dados para records
+- ✅ Use init-only properties para imutabilidade
+- ✅ Simplifique Program.cs com top-level statements
+- ✅ Use relational/logical patterns em validações
+
+---
+
+### C# 10 (2021): Global Usings e File-Scoped Namespaces
+
+**Versão**: .NET 6 LTS | **Foco**: Redução de ruído sintático
+
+#### 1. Global Usings ⭐
+
+**Elimina repetição de usings em todos os arquivos**:
+
+```csharp
+// ✅ C# 10 - Criar arquivo GlobalUsings.cs
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading.Tasks;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.EntityFrameworkCore;
+
+// Agora todos os arquivos do projeto têm esses usings automaticamente
+```
+
+**Habilitando Implicit Usings**:
+```xml
+<!-- No .csproj - Inclui usings comuns automaticamente -->
+<PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+</PropertyGroup>
+```
+
+**Usings Implícitos por Tipo de Projeto**:
+- **Console/Library**: System, System.Collections.Generic, System.Linq, etc.
+- **ASP.NET Core**: Microsoft.AspNetCore.Builder, Microsoft.AspNetCore.Http, etc.
+- **Worker Service**: Microsoft.Extensions.Hosting, etc.
+
+#### 2. File-Scoped Namespaces
+
+**Reduz indentação em 1 nível**:
+
+```csharp
+// ❌ C# 9 - Namespace tradicional
+namespace MinhaEmpresa.Pedidos.Domain
+{
+    public class Pedido
+    {
+        public int Id { get; set; }
+        public decimal Total { get; set; }
+    }
+}
+
+// ✅ C# 10 - File-scoped namespace
+namespace MinhaEmpresa.Pedidos.Domain;
+
+public class Pedido
+{
+    public int Id { get; set; }
+    public decimal Total { get; set; }
+}
+```
+
+**Impacto**: Economiza 1 nível de indentação em **todo** o arquivo.
+
+#### 3. Record Structs
+
+**Records agora funcionam com structs para performance**:
+
+```csharp
+// ✅ C# 10 - Record struct (value type, imutável)
+public readonly record struct Ponto(int X, int Y);
+
+// Comparação por valor + sem alocação no heap
+var p1 = new Ponto(10, 20);
+var p2 = new Ponto(10, 20);
+Console.WriteLine(p1 == p2); // True
+Console.WriteLine(p1.GetType().IsValueType); // True
+```
+
+**Quando Usar Record Struct vs Record Class**:
+- **Record struct**: Dados pequenos (<16 bytes), alta frequência, performance crítica
+- **Record class**: DTOs, dados maiores, compartilhamento de referência
+
+#### 4. Interpolated String Improvements
+
+```csharp
+// ✅ C# 10 - Interpolação em const strings
+const string Nome = "Sistema";
+const string Versao = "2.0";
+const string Titulo = $"{Nome} v{Versao}"; // Agora permitido!
+
+// ✅ C# 10 - String interpolation handlers (performance)
+// Uso com ILogger - não aloca strings se log está desabilitado
+logger.LogInformation("Processando pedido {PedidoId} do cliente {ClienteId}", 
+    pedido.Id, pedido.ClienteId);
+```
+
+#### 5. Lambda Improvements
+
+```csharp
+// ✅ C# 10 - Lambdas com atributos
+var validar = ([NotNull] Usuario u) => u.Nome.Length > 0;
+
+// ✅ C# 10 - Inferência de tipo natural
+var parse = (string s) => int.Parse(s); // Tipo inferido: Func<string, int>
+
+// ✅ C# 10 - Lambdas com explicit return type
+var calcular = int (int x) => x * 2;
+```
+
+**Checklist de Migração C# 10**:
+- ✅ Crie arquivo GlobalUsings.cs com usings comuns
+- ✅ Habilite `<ImplicitUsings>enable</ImplicitUsings>`
+- ✅ Migre todos os namespaces para file-scoped
+- ✅ Use record structs para dados pequenos e frequentes
+
+---
+
+### C# 11 (2022): Raw Strings e Required Members
+
+**Versão**: .NET 7 | **Foco**: Developer experience
+
+#### 1. Raw String Literals ⭐
+
+**Strings multilinhas sem escape characters**:
+
+```csharp
+// ❌ C# 10 - JSON com escape hell
+string json = "{\"nome\":\"João\",\"idade\":30}";
+string sql = "SELECT * FROM usuarios\r\nWHERE ativo = 1\r\nORDER BY nome";
+
+// ✅ C# 11 - Raw string literals
+string json = """
+    {
+        "nome": "João",
+        "idade": 30
+    }
+    """;
+
+string sql = """
+    SELECT * FROM usuarios
+    WHERE ativo = 1
+    ORDER BY nome
+    """;
+```
+
+**Interpolação em Raw Strings**:
+```csharp
+var nome = "Maria";
+var idade = 25;
+
+// ✅ C# 11 - Raw string com interpolação
+string json = $$"""
+    {
+        "usuario": {
+            "nome": "{{nome}}",
+            "idade": {{idade}},
+            "ativo": true
+        }
+    }
+    """;
+```
+
+**Regex sem Escapes**:
+```csharp
+// ❌ C# 10 - Escape characters confusos
+var regex = new Regex("\\d{3}-\\d{2}-\\d{4}");
+
+// ✅ C# 11 - Raw string
+var regex = new Regex("""^\d{3}-\d{2}-\d{4}$""");
+```
+
+#### 2. Required Members
+
+**Garante inicialização de propriedades obrigatórias**:
+
+```csharp
+// ✅ C# 11 - Required properties
+public class Usuario
+{
+    public required string Nome { get; init; }
+    public required string Email { get; init; }
+    public string? Telefone { get; init; }
+}
+
+// ❌ Erro de compilação - falta Nome e Email
+var usuario = new Usuario { Telefone = "123" };
+
+// ✅ OK
+var usuario = new Usuario 
+{ 
+    Nome = "João",
+    Email = "joao@example.com"
+};
+```
+
+**Com Construtores**:
+```csharp
+public class Produto
+{
+    public required string Nome { get; init; }
+    public required decimal Preco { get; init; }
+    public int Estoque { get; init; }
+    
+    [SetsRequiredMembers] // Indica que construtor define required members
+    public Produto(string nome, decimal preco)
+    {
+        Nome = nome;
+        Preco = preco;
+        Estoque = 0;
+    }
+}
+
+// ✅ Ambos são válidos
+var p1 = new Produto { Nome = "Mouse", Preco = 50 };
+var p2 = new Produto("Teclado", 150);
+```
+
+#### 3. List Patterns
+
+**Pattern matching em coleções**:
+
+```csharp
+// ✅ C# 11 - List patterns
+public string AnalisarArray(int[] numeros) => numeros switch
+{
+    [] => "Vazio",
+    [var unico] => $"Um elemento: {unico}",
+    [var primeiro, var segundo] => $"Dois: {primeiro} e {segundo}",
+    [var primeiro, .., var ultimo] => $"Primeiro: {primeiro}, Último: {ultimo}",
+    _ => "Múltiplos elementos"
+};
+
+// Exemplo prático
+public bool EhSequenciaValida(string[] comandos) => comandos switch
+{
+    ["start", .., "stop"] => true, // Deve começar com start e terminar com stop
+    ["init", _, "run"] => true, // init, qualquer comando, run
+    _ => false
+};
+```
+
+#### 4. Generic Attributes
+
+```csharp
+// ✅ C# 11 - Atributos genéricos
+[AttributeUsage(AttributeTargets.Class)]
+public class ValidadorAttribute<T> : Attribute where T : IValidator
+{
+    public Type ValidatorType => typeof(T);
+}
+
+[Validador<UsuarioValidator>]
+public class Usuario
+{
+    public string Nome { get; set; }
+}
+```
+
+**Checklist de Migração C# 11**:
+- ✅ Migre strings complexas (JSON, SQL, Regex) para raw strings
+- ✅ Adicione `required` em propriedades obrigatórias de DTOs
+- ✅ Use list patterns para validação de sequências
+
+---
+
+### C# 12 (2023): Primary Constructors e Collection Expressions
+
+**Versão**: .NET 8 LTS | **Foco**: Concisão e expressividade
+
+#### 1. Primary Constructors ⭐
+
+**Construtores inline na declaração da classe**:
+
+```csharp
+// ❌ C# 11 - Boilerplate de DI
+public class PedidoService
+{
+    private readonly ILogger<PedidoService> _logger;
+    private readonly IPedidoRepository _repository;
+    private readonly IEmailService _emailService;
+    
+    public PedidoService(
+        ILogger<PedidoService> logger,
+        IPedidoRepository repository,
+        IEmailService emailService)
+    {
+        _logger = logger;
+        _repository = repository;
+        _emailService = emailService;
+    }
+    
+    public async Task ProcessarAsync(int id)
+    {
+        _logger.LogInformation("Processando {Id}", id);
+        // ...
+    }
+}
+
+// ✅ C# 12 - Primary constructor
+public class PedidoService(
+    ILogger<PedidoService> logger,
+    IPedidoRepository repository,
+    IEmailService emailService)
+{
+    public async Task ProcessarAsync(int id)
+    {
+        logger.LogInformation("Processando {Id}", id);
+        var pedido = await repository.ObterPorIdAsync(id);
+        await emailService.EnviarConfirmacaoAsync(pedido);
+    }
+}
+```
+
+**Redução**: 9 linhas → 0 linhas de boilerplate (100% de economia)!
+
+**Com Validação**:
+```csharp
+// ✅ C# 12 - Primary constructor com validação
+public class Produto(string nome, decimal preco, int estoque = 0)
+{
+    public string Nome { get; } = !string.IsNullOrWhiteSpace(nome)
+        ? nome.Trim()
+        : throw new ArgumentException("Nome obrigatório", nameof(nome));
+    
+    public decimal Preco { get; } = preco >= 0
+        ? preco
+        : throw new ArgumentOutOfRangeException(nameof(preco));
+    
+    public int Estoque { get; } = estoque;
+    
+    // Parâmetros do primary constructor ficam disponíveis em toda a classe
+    public void ExibirInfo()
+    {
+        Console.WriteLine($"{nome}: R$ {preco:F2}"); // Acesso direto aos parâmetros
+    }
+}
+```
+
+#### 2. Collection Expressions ⭐
+
+**Sintaxe unificada para criar coleções**:
+
+```csharp
+// ❌ C# 11 - Múltiplas sintaxes confusas
+int[] array = new int[] { 1, 2, 3 };
+List<int> lista = new List<int> { 1, 2, 3 };
+ImmutableArray<int> imutavel = ImmutableArray.Create(1, 2, 3);
+
+// ✅ C# 12 - Sintaxe unificada
+int[] array = [1, 2, 3];
+List<int> lista = [1, 2, 3];
+ImmutableArray<int> imutavel = [1, 2, 3];
+```
+
+**Spread Operator (..):**
+```csharp
+// ✅ C# 12 - Combinar coleções facilmente
+int[] numeros1 = [1, 2, 3];
+int[] numeros2 = [4, 5];
+int[] combinado = [..numeros1, ..numeros2]; // [1, 2, 3, 4, 5]
+
+// ✅ Inserir elementos no meio
+int[] comExtra = [..numeros1, 99, ..numeros2]; // [1, 2, 3, 99, 4, 5]
+
+// ✅ Com LINQ
+List<string> nomes = ["Ana", "Bruno", "Carlos"];
+List<string> nomesFiltrados = [..nomes.Where(n => n.StartsWith("A"))];
+```
+
+**Exemplos Práticos**:
+```csharp
+// ✅ Inicialização de parâmetros
+public void ProcessarItens(params int[] itens) { }
+ProcessarItens([1, 2, 3, 4, 5]);
+
+// ✅ Return collections
+public List<Produto> ObterProdutosDestaque()
+{
+    var premium = ObterProdutosPremium();
+    var promocao = ObterProdutosPromocao();
+    return [..premium, ..promocao];
+}
+```
+
+#### 3. Ref Readonly Parameters
+
+```csharp
+// ✅ C# 12 - Passar grandes structs sem cópia, mas readonly
+public readonly record struct GrandeStruct(int A, int B, int C, int D);
+
+public int ProcessarStruct(ref readonly GrandeStruct dados)
+{
+    // dados não pode ser modificado
+    // Sem cópia (passa por referência)
+    return dados.A + dados.B;
+}
+```
+
+#### 4. Alias de Tipos Complexos
+
+```csharp
+// ✅ C# 12 - Alias para tipos complexos
+using PedidoDictionary = System.Collections.Generic.Dictionary<int, (string Nome, decimal Valor)>;
+
+public class PedidoService
+{
+    private PedidoDictionary _cache = new();
+    
+    public void AdicionarPedido(int id, string nome, decimal valor)
+    {
+        _cache[id] = (nome, valor);
+    }
+}
+```
+
+**Checklist de Migração C# 12**:
+- ✅ Migre classes de serviço para primary constructors
+- ✅ Substitua `new int[] {}` por `[]` collection expressions
+- ✅ Use `..` spread operator para combinar coleções
+- ✅ Adicione aliases para tipos genéricos complexos frequentes
+
+---
+
+### C# 13 (2024): Performance e Params Span
+
+**Versão**: .NET 9 | **Foco**: Performance zero-allocation
+
+#### 1. params Span<T> ⭐
+
+**Elimina alocações em métodos params**:
+
+```csharp
+// ❌ C# 12 - params com array (aloca na heap)
+public int Somar(params int[] numeros)
+{
+    return numeros.Sum();
+}
+
+Somar(1, 2, 3, 4, 5); // Aloca int[] na heap
+
+// ✅ C# 13 - params com Span<T> (zero allocation!)
+public int Somar(params Span<int> numeros)
+{
+    int total = 0;
+    foreach (var n in numeros)
+        total += n;
+    return total;
+}
+
+Somar(1, 2, 3, 4, 5); // Zero heap allocations!
+```
+
+**Impacto de Performance**:
+- Reduz GC pressure em ~70% em hot paths
+- Ideal para processamento de dados em alta frequência
+
+#### 2. Field Keyword (Preview)
+
+```csharp
+// ✅ C# 13 - Acesso ao backing field sintetizado
+public string Nome 
+{ 
+    get => field;
+    set => field = value?.Trim() ?? throw new ArgumentNullException();
+}
+
+// Equivalente manual em C# 12:
+private string _nome;
+public string Nome
+{
+    get => _nome;
+    set => _nome = value?.Trim() ?? throw new ArgumentNullException();
+}
+```
+
+#### 3. Lock Object Improvements
+
+```csharp
+// ✅ C# 13 - Lock otimizado
+private readonly Lock _lock = new(); // System.Threading.Lock
+
+public void MetodoThread Safe()
+{
+    lock (_lock) // Mais rápido que lock(object)
+    {
+        // código thread-safe
+    }
+}
+```
+
+**Checklist de Migração C# 13**:
+- ✅ Migre métodos params frequentes para `Span<T>`
+- ✅ Use `Lock` type para melhor performance em sincronização
+- ✅ Considere field keyword para propriedades com validação
+
+---
+
+### C# 14 (2025 – .NET 10): Extension Members e Futuro
+
+**Versão**: .NET 10 LTS | **Foco**: Extensibilidade e produtividade
+
+#### 1. Extension Members ⭐
+
+**Nova sintaxe para extension methods, properties, e operators**:
+
+```csharp
+// ❌ C# 13 - Extension methods tradicionais
+public static class StringExtensions
+{
+    public static bool EhEmail(this string texto)
+    {
+        return texto.Contains("@") && texto.Contains(".");
+    }
+    
+    public static string TruncateAt(this string texto, int maxLength)
+    {
+        return texto.Length > maxLength 
+            ? texto.Substring(0, maxLength) + "..." 
+            : texto;
+    }
+}
+
+// ✅ C# 14 - Extension members (nova sintaxe)
+extension StringValidation(string texto)
+{
+    public bool EhEmail => texto.Contains("@") && texto.Contains(".");
+    public bool EhVazio => string.IsNullOrWhiteSpace(texto);
+    
+    public string TruncateAt(int maxLength) =>
+        texto.Length > maxLength 
+            ? texto.Substring(0, maxLength) + "..." 
+            : texto;
+}
+
+// Uso (idêntico)
+string email = "user@example.com";
+bool valido = email.EhEmail; // Agora pode ser property!
+string curto = email.TruncateAt(10);
+```
+
+**Extension Properties**:
+```csharp
+// ✅ C# 14 - Extension properties
+extension ListExtensions<T>(List<T> lista)
+{
+    public bool EstaVazia => lista.Count == 0;
+    public T? PrimeiroOuPadrao => lista.Count > 0 ? lista[0] : default;
+    public int UltimoIndice => lista.Count - 1;
+}
+
+var numeros = new List<int> { 1, 2, 3 };
+Console.WriteLine(numeros.EstaVazia); // false
+Console.WriteLine(numeros.PrimeiroOuPadrao); // 1
+```
+
+**Extension Operators**:
+```csharp
+// ✅ C# 14 - Extension operators
+extension VectorExtensions(int[] vetor)
+{
+    public static int[] operator +(int[] a, int[] b)
+    {
+        if (a.Length != b.Length)
+            throw new ArgumentException("Vetores devem ter mesmo tamanho");
+        
+        return a.Zip(b, (x, y) => x + y).ToArray();
+    }
+}
+
+int[] v1 = [1, 2, 3];
+int[] v2 = [4, 5, 6];
+int[] soma = v1 + v2; // [5, 7, 9]
+```
+
+#### 2. field Keyword (Finalizado)
+
+```csharp
+// ✅ C# 14 - field keyword para backing fields
+public class Usuario
+{
+    public string Nome 
+    { 
+        get => field;
+        set => field = value?.Trim() ?? throw new ArgumentNullException(nameof(value));
+    }
+    
+    public string Email
+    {
+        get => field;
+        set
+        {
+            if (!value.Contains("@"))
+                throw new ArgumentException("Email inválido");
+            field = value.ToLower();
+        }
+    }
+}
+```
+
+**Benefício**: Elimina necessidade de declarar backing fields manualmente (_nome, _email).
+
+#### 3. Null-Conditional Assignment
+
+```csharp
+// ❌ C# 13 - Null check verboso
+if (cliente != null)
+{
+    cliente.UltimoAcesso = DateTime.Now;
+}
+
+// ✅ C# 14 - Null-conditional assignment
+cliente?.UltimoAcesso = DateTime.Now;
+```
+
+#### 4. nameof para Tipos Genéricos
+
+```csharp
+// ✅ C# 14 - nameof com tipos genéricos (novidade do C# 14)
+Console.WriteLine(nameof(List<int>)); // "List" (erro antes do C# 14)
+Console.WriteLine(nameof(Dictionary<,>)); // "Dictionary"
+
+// Útil em logging e exceptions
+throw new InvalidOperationException(
+    $"Erro ao processar {nameof(IEnumerable<Produto>)}");
+```
+
+#### 5. Lambda Improvements Finais
+
+```csharp
+// ✅ C# 14 - Inferência de tipo melhorada em lambdas
+var processar = (string texto) => 
+{
+    int.TryParse(texto, out var resultado);
+    return resultado;
+};
+
+// ✅ C# 14 - Natural type para lambdas
+var calcular = (int x, int y) => x + y; // Tipo: Func<int, int, int>
+```
+
+**Checklist de Migração C# 14**:
+- ✅ Migre extension methods para extension members onde apropriado
+- ✅ Use `field` keyword em propriedades com validação
+- ✅ Simplifique null assignments com `?.=`
+- ✅ Use `nameof()` com tipos genéricos em logging
+
+---
+
+### Comparativo de Impacto por Versão
+
+| Versão | Features Principais | Redução de Código | Impacto em Segurança | Adoção Recomendada |
+|--------|-------------------|------------------|---------------------|-------------------|
+| **C# 6** | Null-conditional, string interpolation | 20-30% | Médio | ⭐⭐⭐⭐ Alta |
+| **C# 7** | Tuplas, pattern matching | 15-25% | Baixo | ⭐⭐⭐⭐ Alta |
+| **C# 8** | Nullable reference types, switch expressions | 10-20% | **Alto** | ⭐⭐⭐⭐⭐ Crítica |
+| **C# 9** | Records, init-only, top-level | 30-50% | Médio | ⭐⭐⭐⭐⭐ Crítica |
+| **C# 10** | Global usings, file-scoped namespaces | 10-15% | Baixo | ⭐⭐⭐⭐ Alta |
+| **C# 11** | Raw strings, required members | 5-15% | Médio | ⭐⭐⭐ Média |
+| **C# 12** | Primary constructors, collection expressions | 40-60% | Baixo | ⭐⭐⭐⭐⭐ Crítica |
+| **C# 13** | params Span<T> | 0-5% | Baixo | ⭐⭐ Baixa (performance) |
+| **C# 14** | Extension members, field keyword | 5-10% | Baixo | ⭐⭐⭐ Média |
+
+### Estratégia de Adoção por Prioridade
+
+#### Prioridade 1 (Essencial - Comece Aqui)
+1. **C# 8 - Nullable Reference Types**: Reduz bugs de produção em 30%
+2. **C# 9 - Records**: Elimina boilerplate em DTOs
+3. **C# 12 - Primary Constructors**: Simplifica dependency injection
+
+#### Prioridade 2 (Alta Produtividade)
+4. **C# 10 - Global Usings & File-Scoped Namespaces**: Reduz ruído
+5. **C# 6 - Null-Conditional & String Interpolation**: Código mais limpo
+6. **C# 8 - Switch Expressions**: Lógica condicional elegante
+
+#### Prioridade 3 (Casos Específicos)
+7. **C# 11 - Raw Strings**: Para JSON, SQL, Regex complexos
+8. **C# 13 - params Span<T>**: Para hot paths de performance
+9. **C# 14 - Extension Members**: Quando criar APIs extensíveis
+
+### Recursos para Aprofundamento
+
+**Documentação Oficial**:
+- [What's New in C# (Microsoft Learn)](https://learn.microsoft.com/dotnet/csharp/whats-new/)
+- [C# Language Specification](https://learn.microsoft.com/dotnet/csharp/language-reference/language-specification/)
+- [C# Feature History](https://learn.microsoft.com/dotnet/csharp/whats-new/csharp-version-history)
+
+**Ferramentas de Migração**:
+- **Roslyn Analyzers**: Sugerem modernizações automáticas
+- **Visual Studio Refactoring**: Converte código legado para novos patterns
+- **ReSharper**: Detecta oportunidades de simplificação
+
+**Próximo Passo**: Continue para o [Capítulo 4](#capítulo-4-features-avançadas--exemplos-práticos) para exemplos avançados de Primary Constructors e Source Generators.
 
 ---
 
