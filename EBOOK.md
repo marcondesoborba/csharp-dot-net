@@ -16,6 +16,16 @@
 5. [Capítulo 4: Features Avançadas – Exemplos Práticos](#capítulo-4-features-avançadas--exemplos-práticos)
    - [Primary Constructors (C# 12+)](#primary-constructors-c-12)
    - [Source Generators](#source-generators)
+   - [Pattern Matching Avançado](#pattern-matching-avançado)
+   - [Collection Expressions e Spread Operator](#collection-expressions-e-spread-operator)
+   - [Records e Positional Records](#records-e-positional-records)
+   - [Required Members e Init-only Properties](#required-members-e-init-only-properties)
+   - [File-scoped Types e Namespaces](#file-scoped-types-e-namespaces)
+   - [Raw String Literals e String Interpolation Avançado](#raw-string-literals-e-string-interpolation-avançado)
+   - [Generic Math e Operadores Estáticos](#generic-math-e-operadores-estáticos)
+   - [Interceptors (C# 12+)](#interceptors-c-12)
+   - [Async Streams e IAsyncEnumerable](#async-streams-e-iasyncenumerable)
+   - [Span, Memory e Stack Allocation](#span-memory-e-stack-allocation)
 6. [Capítulo 5: Cheatsheet C# e .NET (8 a 10)](#capítulo-5-cheatsheet-c-e-net-8-a-10)
 7. [Capítulo 6: Ecossistema Moderno](#capítulo-6-ecossistema-moderno)
 8. [Capítulo 7: Ferramentas 2026](#capítulo-7-ferramentas-2026)
@@ -5013,6 +5023,1776 @@ public record Pessoa(string Nome, int Idade, string Email);
 - Em .NET 10/C# 14: Melhoria em source generators para partial members e extension members – use para gerar extensions automáticas.
 - Evite gerar código excessivo (mantenha < 10k linhas por arquivo gerado).
 - Debugging: Use `Debugger.Launch()` no generator para pausar no build.
+
+### Pattern Matching Avançado
+
+Pattern matching é uma das features mais poderosas do C# moderno, permitindo código expressivo e conciso para decisões complexas.
+
+#### 1. Switch Expressions com Patterns Complexos
+
+```csharp
+// Exemplo: Sistema de descontos baseado em regras complexas
+public decimal CalcularDesconto(Pedido pedido) => pedido switch
+{
+    // Pattern de propriedade + condição
+    { Total: > 1000, Cliente.Tipo: "VIP" } => pedido.Total * 0.20m,
+    { Total: > 500, Cliente.Tipo: "VIP" } => pedido.Total * 0.15m,
+    
+    // Pattern com lista de elementos
+    { Itens.Count: > 10 } => pedido.Total * 0.10m,
+    { Itens: [_, _, .., var ultimo] } when ultimo.Preco > 100 => pedido.Total * 0.05m,
+    
+    // Pattern relacional
+    { Total: >= 100 and < 500 } => pedido.Total * 0.05m,
+    
+    // Pattern de tipo com cast
+    { FormaPagamento: PagamentoCartao { Bandeira: "Visa" } } => pedido.Total * 0.03m,
+    
+    // Default
+    _ => 0m
+};
+```
+
+#### 2. List Patterns (C# 11+)
+
+```csharp
+public string AnalisarSequencia(int[] numeros) => numeros switch
+{
+    // Lista vazia
+    [] => "Vazio",
+    
+    // Um único elemento
+    [var x] => $"Um elemento: {x}",
+    
+    // Dois elementos específicos
+    [1, 2] => "Um, Dois",
+    
+    // Padrão com slice (..)
+    [1, .., 10] => "Começa com 1 e termina com 10",
+    
+    // Captura de elementos
+    [var primeiro, var segundo, ..] => $"Primeiros: {primeiro}, {segundo}",
+    
+    // Condição com elementos
+    [> 0, > 0, > 0] => "Todos os três primeiros são positivos",
+    
+    _ => "Outra sequência"
+};
+```
+
+#### 3. Type Patterns e Pattern Combinators
+
+```csharp
+public string ProcessarMensagem(object mensagem) => mensagem switch
+{
+    // Pattern de tipo com deconstruction
+    Pedido { Status: "Pendente", Total: > 1000 } p 
+        => $"Pedido grande pendente: {p.Id}",
+    
+    // Pattern AND
+    string s when s.Length > 10 and s.StartsWith("CMD_") 
+        => $"Comando: {s}",
+    
+    // Pattern OR
+    int n when n is > 0 and < 10 or > 90 and < 100 
+        => "Número especial",
+    
+    // Pattern NOT
+    not null => "Não nulo",
+    
+    null => "Nulo"
+};
+```
+
+#### 4. Positional Patterns com Records
+
+```csharp
+public record Ponto(int X, int Y);
+public record Retangulo(Ponto TopLeft, Ponto BottomRight);
+
+public string ClassificarForma(Retangulo ret) => ret switch
+{
+    // Deconstrói nested records
+    ({ X: 0, Y: 0 }, { X: var w, Y: var h }) => $"Na origem, tamanho {w}x{h}",
+    
+    // Pattern com cálculo
+    (var tl, var br) when (br.X - tl.X) == (br.Y - tl.Y) => "Quadrado",
+    
+    _ => "Retângulo genérico"
+};
+```
+
+#### 5. Pattern Matching em Expressões Lambda (C# 13+)
+
+```csharp
+// Filtro avançado com pattern matching
+var pedidosEspeciais = pedidos.Where(p => p is 
+    { Status: "Aprovado", Total: > 500 } or 
+    { Cliente.Nivel: "Premium" });
+
+// Select com pattern
+var resumos = pedidos.Select(p => p switch
+{
+    { Urgente: true } => new { p.Id, Tipo = "Urgente", p.Total },
+    _ => new { p.Id, Tipo = "Normal", p.Total }
+});
+```
+
+#### 6. Extended Property Patterns (C# 10+)
+
+```csharp
+public record Pessoa(string Nome, Endereco Endereco);
+public record Endereco(string Rua, string Cidade, string Estado);
+
+public bool EhDeSaoPaulo(Pessoa pessoa) => pessoa is
+{
+    Endereco.Estado: "SP",
+    Endereco.Cidade: "São Paulo"
+};
+
+// Mesmo que acima, mas mais conciso
+public bool EhDeSaoPauloV2(Pessoa p) => p.Endereco is { Estado: "SP", Cidade: "São Paulo" };
+```
+
+**Vantagens avançadas**:
+- **Performance**: Compilador gera código otimizado, muitas vezes mais rápido que if/else encadeados
+- **Null-safety**: Combinado com nullable reference types, elimina NullReferenceException
+- **Manutenibilidade**: Código declarativo é mais fácil de entender e modificar
+
+### Collection Expressions e Spread Operator
+
+Collection expressions (C# 12) revolucionam a criação e manipulação de coleções com sintaxe ultra-concisa.
+
+#### 1. Sintaxe Básica de Collection Expressions
+
+```csharp
+// Antes (C# 11 e anteriores)
+int[] numeros = new int[] { 1, 2, 3, 4, 5 };
+List<string> nomes = new List<string> { "Ana", "Beto", "Carlos" };
+
+// C# 12+ Collection Expressions
+int[] numeros = [1, 2, 3, 4, 5];
+List<string> nomes = ["Ana", "Beto", "Carlos"];
+Span<int> span = [1, 2, 3]; // Funciona com Span!
+```
+
+#### 2. Spread Operator (..)
+
+```csharp
+int[] parte1 = [1, 2, 3];
+int[] parte2 = [4, 5, 6];
+
+// Combina arrays
+int[] completo = [..parte1, ..parte2]; // [1, 2, 3, 4, 5, 6]
+
+// Adiciona elementos
+int[] comExtras = [0, ..parte1, 7, 8]; // [0, 1, 2, 3, 7, 8]
+
+// Funciona com qualquer IEnumerable
+List<string> lista1 = ["a", "b"];
+HashSet<string> set = ["c", "d"];
+string[] resultado = [..lista1, ..set, "e"]; // ["a", "b", "c", "d", "e"]
+```
+
+#### 3. Collection Expressions com LINQ
+
+```csharp
+// Filtra e cria nova coleção em uma linha
+var usuarios = ObterUsuarios();
+var nomesAtivos = [..usuarios.Where(u => u.Ativo).Select(u => u.Nome)];
+
+// Combina múltiplas queries
+var todosIds = [
+    ..pedidos.Select(p => p.Id),
+    ..faturas.Select(f => f.Id),
+    ..orcamentos.Select(o => o.Id)
+];
+```
+
+#### 4. Uso Avançado com Spans e Memory
+
+```csharp
+public void ProcessarDadosEficiente(ReadOnlySpan<int> entrada)
+{
+    // Cria Span direto com collection expression
+    Span<int> buffer = [..entrada, 0, 0]; // Adiciona dois zeros
+    
+    // Sem alocação heap!
+    Span<int> processado = stackalloc int[entrada.Length];
+    for (int i = 0; i < entrada.Length; i++)
+    {
+        processado[i] = entrada[i] * 2;
+    }
+}
+```
+
+#### 5. Deconstruction com Collection Expressions
+
+```csharp
+// Deconstruction de arrays
+int[] valores = [1, 2, 3, 4, 5];
+var [primeiro, segundo, ..resto] = valores;
+// primeiro = 1, segundo = 2, resto = [3, 4, 5]
+
+// Pattern matching + collection expression
+public void ProcessarLista(int[] nums)
+{
+    switch (nums)
+    {
+        case [var x, var y, ..var resto] when resto.Length > 0:
+            Console.WriteLine($"Pelo menos 3 elementos: {x}, {y}, ... ({resto.Length} mais)");
+            break;
+        case [var unico]:
+            Console.WriteLine($"Apenas um: {unico}");
+            break;
+    }
+}
+```
+
+#### 6. Criação de Coleções Imutáveis
+
+```csharp
+using System.Collections.Immutable;
+
+// Collection expression funciona com tipos imutáveis
+ImmutableArray<int> imutavel = [1, 2, 3, 4, 5];
+ImmutableList<string> lista = ["item1", "item2"];
+
+// Combinação com spread
+ImmutableArray<int> expandido = [..imutavel, 6, 7, 8];
+```
+
+**Performance**:
+- Collection expressions são otimizadas pelo compilador
+- Para arrays conhecidos em compile-time, usa alocação inline
+- Para Span<T>, evita alocações heap completamente
+
+### Records e Positional Records
+
+Records são tipos imutáveis perfeitos para DTOs, value objects e transferência de dados.
+
+#### 1. Record Básico vs. Record Positional
+
+```csharp
+// Record tradicional (propriedades explícitas)
+public record Usuario
+{
+    public int Id { get; init; }
+    public string Nome { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
+}
+
+// Positional Record (mais conciso)
+public record UsuarioPositional(int Id, string Nome, string Email);
+
+// Uso
+var user = new UsuarioPositional(1, "Ana", "ana@email.com");
+
+// Deconstruction automática
+var (id, nome, email) = user;
+```
+
+#### 2. Records com Validação e Lógica
+
+```csharp
+public record Produto(string Nome, decimal Preco, int Estoque)
+{
+    // Validação no construtor primário via propriedades
+    public string Nome { get; init; } = !string.IsNullOrWhiteSpace(Nome)
+        ? Nome.Trim()
+        : throw new ArgumentException("Nome inválido");
+
+    public decimal Preco { get; init; } = Preco >= 0
+        ? Preco
+        : throw new ArgumentException("Preço não pode ser negativo");
+
+    // Propriedades calculadas
+    public decimal ValorEstoque => Preco * Estoque;
+    
+    // Métodos
+    public bool PrecisaRepor() => Estoque < 10;
+}
+```
+
+#### 3. Record Structs (C# 10+)
+
+```csharp
+// Record struct para performance (stack allocation)
+public readonly record struct Ponto3D(double X, double Y, double Z)
+{
+    public double Magnitude => Math.Sqrt(X * X + Y * Y + Z * Z);
+    
+    public Ponto3D Normalizar()
+    {
+        var mag = Magnitude;
+        return mag == 0 ? this : new(X / mag, Y / mag, Z / mag);
+    }
+}
+
+// Zero allocations heap para operações matemáticas
+Ponto3D p1 = new(3, 4, 0);
+Ponto3D p2 = p1.Normalizar(); // Stack only!
+```
+
+#### 4. Herança de Records
+
+```csharp
+public abstract record Veiculo(string Marca, string Modelo, int Ano);
+
+public record Carro(string Marca, string Modelo, int Ano, int NumeroPortas) 
+    : Veiculo(Marca, Modelo, Ano);
+
+public record Moto(string Marca, string Modelo, int Ano, int Cilindradas)
+    : Veiculo(Marca, Modelo, Ano);
+
+// Uso com pattern matching
+public string Descrever(Veiculo veiculo) => veiculo switch
+{
+    Carro { NumeroPortas: 2 } => "Cupê",
+    Carro { NumeroPortas: 4 } => "Sedã",
+    Moto { Cilindradas: > 600 } => "Moto grande",
+    _ => "Veículo"
+};
+```
+
+#### 5. with Expressions (Non-Destructive Mutation)
+
+```csharp
+var pedido1 = new Pedido(Id: 1, Cliente: "Ana", Total: 100m, Status: "Pendente");
+
+// Cria cópia modificando apenas Status
+var pedido2 = pedido1 with { Status = "Aprovado" };
+
+// Múltiplas modificações
+var pedido3 = pedido1 with { Status = "Enviado", Total = 120m };
+
+// with em pipeline
+var pedidoFinal = pedido1
+    with { Status = "Processando" }
+    with { Total = pedido1.Total * 1.1m }; // Adiciona 10%
+```
+
+#### 6. Record em Domínio (DDD)
+
+```csharp
+// Value Object imutável
+public record Email(string Endereco)
+{
+    public Email(string endereco) : this(endereco?.Trim().ToLower() ?? string.Empty)
+    {
+        if (!Endereco.Contains('@'))
+            throw new ArgumentException("Email inválido");
+    }
+}
+
+public record CPF(string Numero)
+{
+    private static readonly Regex CpfRegex = new(@"^\d{11}$");
+    
+    public CPF(string numero) : this(numero?.Replace(".", "").Replace("-", "") ?? string.Empty)
+    {
+        if (!CpfRegex.IsMatch(Numero))
+            throw new ArgumentException("CPF inválido");
+    }
+    
+    public override string ToString() => 
+        $"{Numero[..3]}.{Numero[3..6]}.{Numero[6..9]}-{Numero[9..]}";
+}
+
+// Entity com value objects
+public record Cliente(int Id, string Nome, Email Email, CPF Cpf);
+```
+
+**Quando usar Records**:
+- ✅ DTOs, API models, responses
+- ✅ Value objects (DDD)
+- ✅ Dados imutáveis
+- ✅ Configurações
+- ❌ Entidades com comportamento complexo (prefira classes)
+- ❌ Objetos com estado mutável frequente
+
+### Required Members e Init-only Properties
+
+Features que garantem inicialização obrigatória de propriedades, aumentando a segurança do código.
+
+#### 1. Init-only Properties (C# 9+)
+
+```csharp
+public class Usuario
+{
+    // Pode ser definida apenas na inicialização
+    public int Id { get; init; }
+    public string Nome { get; init; } = string.Empty;
+    
+    // Combinação: validação + init
+    private string _email = string.Empty;
+    public string Email
+    {
+        get => _email;
+        init => _email = value?.Contains('@') == true 
+            ? value 
+            : throw new ArgumentException("Email inválido");
+    }
+}
+
+// Uso
+var usuario = new Usuario
+{
+    Id = 1,
+    Nome = "Ana",
+    Email = "ana@email.com"
+};
+
+// usuario.Id = 2; // ❌ Erro de compilação
+```
+
+#### 2. Required Members (C# 11+)
+
+```csharp
+public class Configuracao
+{
+    // Obrigatório definir na inicialização
+    public required string ConnectionString { get; init; }
+    public required string ApiKey { get; init; }
+    
+    // Opcional
+    public int Timeout { get; init; } = 30;
+}
+
+// ✅ Válido
+var config = new Configuracao
+{
+    ConnectionString = "Server=localhost;Database=test",
+    ApiKey = "abc123"
+};
+
+// ❌ Erro de compilação: required members não inicializados
+// var config2 = new Configuracao { Timeout = 60 };
+```
+
+#### 3. Required + Primary Constructors
+
+```csharp
+// Combina required com primary constructor
+public class PedidoService(ILogger<PedidoService> logger, IPedidoRepository repository)
+{
+    // Injetado via construtor primário
+    private readonly ILogger<PedidoService> _logger = logger;
+    private readonly IPedidoRepository _repository = repository;
+    
+    // Required via object initializer
+    public required IEmailService EmailService { get; init; }
+    public required INotificationService NotificationService { get; init; }
+}
+
+// Uso com DI
+services.AddScoped<PedidoService>(provider => new PedidoService(
+    provider.GetRequiredService<ILogger<PedidoService>>(),
+    provider.GetRequiredService<IPedidoRepository>())
+{
+    EmailService = provider.GetRequiredService<IEmailService>(),
+    NotificationService = provider.GetRequiredService<INotificationService>()
+});
+```
+
+#### 4. SetsRequiredMembers Attribute
+
+```csharp
+public class Pessoa
+{
+    public required string Nome { get; init; }
+    public required int Idade { get; init; }
+    
+    // Construtor que satisfaz todos os required members
+    [SetsRequiredMembers]
+    public Pessoa(string nome, int idade)
+    {
+        Nome = nome;
+        Idade = idade;
+    }
+    
+    // Construtor sem inicializar: requer object initializer
+    public Pessoa() { }
+}
+
+// ✅ Via construtor (satisfaz required)
+var p1 = new Pessoa("Ana", 30);
+
+// ✅ Via object initializer
+var p2 = new Pessoa { Nome = "Beto", Idade = 25 };
+
+// ❌ Construtor padrão sem initializer
+// var p3 = new Pessoa(); // Erro!
+```
+
+#### 5. Validação Avançada com init
+
+```csharp
+public class ContaBancaria
+{
+    private decimal _saldo;
+    
+    public required string Titular { get; init; }
+    public required string Numero { get; init; }
+    
+    public decimal Saldo
+    {
+        get => _saldo;
+        init
+        {
+            if (value < 0)
+                throw new ArgumentException("Saldo inicial não pode ser negativo");
+            _saldo = value;
+        }
+    }
+    
+    // Propriedade calculada readonly
+    public string TitularFormatado => Titular.ToUpper();
+}
+```
+
+#### 6. Patterns para Configuração Type-Safe
+
+```csharp
+// Options pattern com required
+public class DatabaseOptions
+{
+    public const string Section = "Database";
+    
+    public required string ConnectionString { get; init; }
+    public required int MaxPoolSize { get; init; }
+    public int CommandTimeout { get; init; } = 30;
+    public bool EnableLogging { get; init; } = true;
+}
+
+// Configuração
+// appsettings.json:
+// {
+//   "Database": {
+//     "ConnectionString": "...",
+//     "MaxPoolSize": 100
+//   }
+// }
+
+// Startup
+services.Configure<DatabaseOptions>(
+    configuration.GetSection(DatabaseOptions.Section));
+
+// Validação em startup
+services.AddOptions<DatabaseOptions>()
+    .BindConfiguration(DatabaseOptions.Section)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+```
+
+### File-scoped Types e Namespaces
+
+Features que simplificam organização de código e reduzem indentação.
+
+#### 1. File-scoped Namespaces (C# 10+)
+
+```csharp
+// Antes (C# 9 e anteriores)
+namespace MinhaEmpresa.Projeto.Dominio
+{
+    public class Usuario
+    {
+        public int Id { get; set; }
+        public string Nome { get; set; }
+    }
+    
+    public class Pedido
+    {
+        public int Id { get; set; }
+    }
+}
+
+// C# 10+ File-scoped namespace
+namespace MinhaEmpresa.Projeto.Dominio;
+
+public class Usuario
+{
+    public int Id { get; set; }
+    public string Nome { get; set; }
+}
+
+public class Pedido
+{
+    public int Id { get; set; }
+}
+```
+
+**Vantagens**:
+- Reduz um nível de indentação em todo o arquivo
+- Mais espaço horizontal para código
+- Padrão recomendado pela Microsoft para novos projetos
+
+#### 2. File-scoped Types (C# 11+)
+
+```csharp
+// Usuario.cs - tipo visível apenas neste arquivo
+namespace MinhaApp.Dominio;
+
+// Público - acessível de qualquer lugar
+public class Usuario
+{
+    public int Id { get; set; }
+    public UsuarioStatus Status { get; set; }
+}
+
+// File-scoped - visível APENAS em Usuario.cs
+file class UsuarioValidator
+{
+    public static bool ValidarNome(string nome) =>
+        !string.IsNullOrWhiteSpace(nome) && nome.Length >= 3;
+}
+
+file enum UsuarioStatus
+{
+    Ativo,
+    Inativo,
+    Bloqueado
+}
+```
+
+#### 3. Uso Prático: Helpers e Extensions Locais
+
+```csharp
+// PedidoService.cs
+namespace MinhaApp.Services;
+
+public class PedidoService(IPedidoRepository repository)
+{
+    public async Task<Pedido> CriarPedidoAsync(CriarPedidoDto dto)
+    {
+        var pedido = PedidoMapper.ToEntity(dto); // Helper file-scoped
+        return await repository.AdicionarAsync(pedido);
+    }
+}
+
+// Mapper visível apenas neste arquivo
+file static class PedidoMapper
+{
+    public static Pedido ToEntity(CriarPedidoDto dto) => new()
+    {
+        ClienteId = dto.ClienteId,
+        Itens = dto.Itens.Select(ToItemEntity).ToList(),
+        DataCriacao = DateTime.UtcNow
+    };
+    
+    private static PedidoItem ToItemEntity(CriarItemDto dto) => new()
+    {
+        ProdutoId = dto.ProdutoId,
+        Quantidade = dto.Quantidade,
+        PrecoUnitario = dto.Preco
+    };
+}
+```
+
+#### 4. Source Generators com File-scoped
+
+```csharp
+// GeneratedCode.g.cs (arquivo gerado)
+namespace MinhaApp.Generated;
+
+// Classes geradas são file-scoped para evitar conflitos
+file class CacheKeyGenerator
+{
+    public static string GerarChave(Type tipo, object id) =>
+        $"{tipo.Name}:{id}";
+}
+
+// Extensões geradas também podem ser file-scoped
+file static class StringExtensions
+{
+    public static string ToKebabCase(this string value) =>
+        Regex.Replace(value, "([a-z])([A-Z])", "$1-$2").ToLower();
+}
+```
+
+#### 5. Organização de Tests com File-scoped
+
+```csharp
+// UsuarioServiceTests.cs
+namespace MinhaApp.Tests.Services;
+
+public class UsuarioServiceTests
+{
+    [Fact]
+    public async Task CriarUsuario_DeveRetornarSucesso()
+    {
+        var service = new UsuarioService(new FakeRepository());
+        var resultado = await service.CriarAsync(UsuarioFaker.Criar());
+        Assert.NotNull(resultado);
+    }
+}
+
+// Fakes e builders file-scoped (não poluem namespace)
+file class FakeRepository : IUsuarioRepository
+{
+    private readonly List<Usuario> _usuarios = [];
+    
+    public Task<Usuario> AdicionarAsync(Usuario usuario)
+    {
+        _usuarios.Add(usuario);
+        return Task.FromResult(usuario);
+    }
+}
+
+file static class UsuarioFaker
+{
+    public static Usuario Criar(string nome = "Teste") => new()
+    {
+        Nome = nome,
+        Email = $"{nome.ToLower()}@test.com"
+    };
+}
+```
+
+#### 6. Global Usings (complemento)
+
+```csharp
+// GlobalUsings.cs (arquivo único no projeto)
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading.Tasks;
+global using Microsoft.Extensions.Logging;
+global using MinhaApp.Dominio;
+global using MinhaApp.Dtos;
+
+// Todos os arquivos do projeto herdam esses usings
+```
+
+**Best Practices**:
+- Use file-scoped namespace como padrão em novos projetos
+- Use file-scoped types para helpers, validators e mappers internos
+- Combine com global usings para reduzir boilerplate
+- Evite file-scoped para tipos que precisam de testes unitários diretos
+
+### Raw String Literals e String Interpolation Avançado
+
+Recursos que tornam trabalho com strings muito mais produtivo e legível.
+
+#### 1. Raw String Literals (C# 11+)
+
+```csharp
+// Antes: escape characters complexos
+string json = "{\n  \"nome\": \"Ana\",\n  \"idade\": 30\n}";
+
+// C# 11: Raw string literal (3+ aspas duplas)
+string jsonRaw = """
+{
+  "nome": "Ana",
+  "idade": 30
+}
+""";
+
+// SQL queries legíveis
+string query = """
+    SELECT u.Id, u.Nome, u.Email
+    FROM Usuarios u
+    WHERE u.Ativo = 1
+        AND u.DataCriacao >= @DataInicio
+    ORDER BY u.Nome
+    """;
+```
+
+#### 2. Raw String Literals com Interpolação
+
+```csharp
+var nome = "Ana";
+var idade = 30;
+
+// Interpolação em raw strings
+string mensagem = $$"""
+    {
+      "usuario": {
+        "nome": "{{nome}}",
+        "idade": {{idade}},
+        "ativo": true
+      }
+    }
+    """;
+
+// Múltiplos $ para escalar chaves
+string complexo = $$$"""
+    Usuário: {{{nome}}}
+    Expressão: {{1 + 1}} (literal)
+    Resultado: {{{2 + 2}}} (interpolado)
+    """;
+```
+
+#### 3. String Interpolation com Formatação Avançada
+
+```csharp
+var preco = 1234.56m;
+var data = DateTime.Now;
+
+// Formatação customizada
+string formatado = $"""
+    Preço: {preco:C2}
+    Data: {data:dd/MM/yyyy HH:mm}
+    Hexadecimal: {42:X}
+    Padding: {123,10:D5}
+    """;
+// Resultado:
+// Preço: R$ 1.234,56
+// Data: 06/02/2026 12:30
+// Hexadecimal: 2A
+// Padding:      00123
+
+// Expressões complexas
+var lista = new[] { 1, 2, 3, 4, 5 };
+string info = $"Total: {lista.Sum()}, Média: {lista.Average():F2}";
+```
+
+#### 4. Interpolated String Handlers (Performance)
+
+```csharp
+// LoggerMessage source generator (sem allocations)
+public static partial class Log
+{
+    [LoggerMessage(
+        EventId = 1,
+        Level = LogLevel.Information,
+        Message = "Processando pedido {PedidoId} para cliente {ClienteNome}")]
+    public static partial void ProcessandoPedido(
+        ILogger logger, int pedidoId, string clienteNome);
+}
+
+// Uso (zero allocations se log desabilitado!)
+Log.ProcessandoPedido(_logger, pedido.Id, pedido.Cliente.Nome);
+
+// Custom interpolated string handler
+[InterpolatedStringHandler]
+public ref struct SqlInterpolatedStringHandler
+{
+    private StringBuilder _builder;
+    private List<object> _parameters;
+    
+    public SqlInterpolatedStringHandler(int literalLength, int formattedCount)
+    {
+        _builder = new StringBuilder(literalLength);
+        _parameters = new(formattedCount);
+    }
+    
+    public void AppendLiteral(string value) => _builder.Append(value);
+    
+    public void AppendFormatted<T>(T value)
+    {
+        var paramName = $"@p{_parameters.Count}";
+        _builder.Append(paramName);
+        _parameters.Add(value!);
+    }
+    
+    public (string Sql, object[] Parameters) GetSqlAndParameters() =>
+        (_builder.ToString(), _parameters.ToArray());
+}
+```
+
+#### 5. Verbatim Strings vs. Raw Strings
+
+```csharp
+// Verbatim string (C# 1.0) - ainda útil para paths
+string path = @"C:\Users\Ana\Documents\file.txt";
+
+// Raw string - melhor para conteúdo multilinha
+string regex = """^\d{3}\.\d{3}\.\d{3}-\d{2}$"""; // Sem escape!
+
+// Comparação: JSON com aspas
+string jsonVerbatim = @"{
+  ""nome"": ""Ana""
+}"; // Precisa de "" para "
+
+string jsonRaw = """
+{
+  "nome": "Ana"
+}
+"""; // Aspas normais!
+```
+
+#### 6. Casos de Uso Avançados
+
+```csharp
+// 1. Templates de código (Source Generators)
+string GenerateClass(string className, string[] properties) => $$"""
+    public class {{className}}
+    {
+        {{string.Join("\n    ", properties.Select(p => $"public string {p} {{ get; set; }}"))}}
+    }
+    """;
+
+// 2. Regex patterns legíveis
+string cpfPattern = """
+    ^
+    \d{3}\.     # Três dígitos + ponto
+    \d{3}\.     # Três dígitos + ponto
+    \d{3}-      # Três dígitos + hífen
+    \d{2}       # Dois dígitos
+    $
+    """;
+var cpfRegex = new Regex(cpfPattern, RegexOptions.IgnorePatternWhitespace);
+
+// 3. Scripts SQL parametrizados
+public (string Sql, object Params) BuildQuery(string tabela, int id)
+{
+    var sql = $$"""
+        SELECT *
+        FROM {{tabela}}
+        WHERE Id = @id
+            AND Ativo = 1
+        """;
+    return (sql, new { id });
+}
+
+// 4. Templates HTML/XML
+string GerarHtml(string titulo, string conteudo) => $$"""
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>{{titulo}}</title>
+      </head>
+      <body>
+        <h1>{{titulo}}</h1>
+        <div>{{conteudo}}</div>
+      </body>
+    </html>
+    """;
+```
+
+**Performance Tips**:
+- Raw strings não têm overhead vs. strings normais
+- Use interpolated string handlers para logs e queries (zero allocations)
+- Para concatenação em loops, ainda use StringBuilder
+- String interpolation é otimizada pelo compilador para poucos valores
+
+### Generic Math e Operadores Estáticos
+
+Recurso revolucionário do C# 11 que permite matemática genérica type-safe.
+
+#### 1. Interfaces de Operadores Matemáticos
+
+```csharp
+// Interface INumber<TSelf> permite operações matemáticas genéricas
+public static T Somar<T>(T a, T b) where T : INumber<T>
+{
+    return a + b; // Funciona com int, double, decimal, BigInteger, etc!
+}
+
+// Uso
+var somaInt = Somar(5, 10);           // 15
+var somaDouble = Somar(3.14, 2.86);   // 6.0
+var somaDecimal = Somar(10.5m, 5.5m); // 16.0
+```
+
+#### 2. Algoritmos Genéricos Reutilizáveis
+
+```csharp
+// Média genérica para qualquer tipo numérico
+public static T Media<T>(params T[] valores) where T : INumber<T>
+{
+    if (valores.Length == 0)
+        throw new ArgumentException("Array vazio");
+    
+    T soma = T.Zero; // Constante estática!
+    foreach (var valor in valores)
+        soma += valor;
+    
+    return soma / T.CreateChecked(valores.Length);
+}
+
+// Uso com diferentes tipos
+var mediaInt = Media(1, 2, 3, 4, 5);        // 3
+var mediaDouble = Media(1.5, 2.5, 3.5);     // 2.5
+var mediaDecimal = Media(10m, 20m, 30m);    // 20m
+```
+
+#### 3. Operadores em Tipos Customizados
+
+```csharp
+public readonly record struct Moeda(decimal Valor, string Simbolo) :
+    IAdditionOperators<Moeda, Moeda, Moeda>,
+    ISubtractionOperators<Moeda, Moeda, Moeda>,
+    IMultiplyOperators<Moeda, decimal, Moeda>
+{
+    public static Moeda operator +(Moeda left, Moeda right)
+    {
+        if (left.Simbolo != right.Simbolo)
+            throw new InvalidOperationException("Moedas diferentes");
+        return new(left.Valor + right.Valor, left.Simbolo);
+    }
+    
+    public static Moeda operator -(Moeda left, Moeda right)
+    {
+        if (left.Simbolo != right.Simbolo)
+            throw new InvalidOperationException("Moedas diferentes");
+        return new(left.Valor - right.Valor, left.Simbolo);
+    }
+    
+    public static Moeda operator *(Moeda left, decimal right) =>
+        new(left.Valor * right, left.Simbolo);
+}
+
+// Uso type-safe
+var real1 = new Moeda(100m, "BRL");
+var real2 = new Moeda(50m, "BRL");
+var total = real1 + real2;           // Moeda(150, "BRL")
+var dobro = real1 * 2;                // Moeda(200, "BRL")
+```
+
+#### 4. Biblioteca Matemática Genérica
+
+```csharp
+public static class MathUtils
+{
+    // Clamp genérico
+    public static T Clamp<T>(T value, T min, T max) 
+        where T : INumber<T>
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+    
+    // Interpolação linear
+    public static T Lerp<T>(T a, T b, T t) 
+        where T : IFloatingPoint<T>
+    {
+        return a + (b - a) * t;
+    }
+    
+    // Distância entre pontos
+    public static T Distance<T>(T x1, T y1, T x2, T y2)
+        where T : IFloatingPoint<T>, IRootFunctions<T>
+    {
+        var dx = x2 - x1;
+        var dy = y2 - y1;
+        return T.Sqrt(dx * dx + dy * dy);
+    }
+    
+    // Fatorial
+    public static T Factorial<T>(int n) where T : INumber<T>
+    {
+        T result = T.One;
+        for (int i = 2; i <= n; i++)
+            result *= T.CreateChecked(i);
+        return result;
+    }
+}
+
+// Uso
+var clamped = MathUtils.Clamp(150, 0, 100);                  // 100
+var interpolated = MathUtils.Lerp(0.0, 10.0, 0.5);          // 5.0
+var dist = MathUtils.Distance(0.0, 0.0, 3.0, 4.0);          // 5.0
+var fatorial = MathUtils.Factorial<BigInteger>(100);         // Número gigante
+```
+
+#### 5. Constantes Matemáticas Genéricas
+
+```csharp
+public static class Constantes
+{
+    // Pi genérico
+    public static T Pi<T>() where T : IFloatingPoint<T> => T.Pi;
+    
+    // E (número de Euler)
+    public static T E<T>() where T : IFloatingPoint<T> => T.E;
+    
+    // Tau (2π)
+    public static T Tau<T>() where T : IFloatingPoint<T> => T.Tau;
+}
+
+// Cálculo de circunferência genérico
+public static T Circunferencia<T>(T raio) where T : IFloatingPoint<T>
+{
+    return T.Tau * raio; // 2πr
+}
+
+var circDouble = Circunferencia(5.0);      // double
+var circFloat = Circunferencia(5.0f);      // float
+var circDecimal = Circunferencia(5.0m);    // ❌ decimal não implementa IFloatingPoint
+```
+
+#### 6. Aplicações Avançadas: Matrizes Genéricas
+
+```csharp
+public class Matriz<T> where T : INumber<T>
+{
+    private readonly T[,] _dados;
+    
+    public Matriz(int linhas, int colunas)
+    {
+        _dados = new T[linhas, colunas];
+    }
+    
+    public T this[int linha, int coluna]
+    {
+        get => _dados[linha, coluna];
+        set => _dados[linha, coluna] = value;
+    }
+    
+    public static Matriz<T> operator +(Matriz<T> a, Matriz<T> b)
+    {
+        if (a._dados.GetLength(0) != b._dados.GetLength(0) ||
+            a._dados.GetLength(1) != b._dados.GetLength(1))
+            throw new ArgumentException("Dimensões incompatíveis");
+        
+        var resultado = new Matriz<T>(a._dados.GetLength(0), a._dados.GetLength(1));
+        for (int i = 0; i < a._dados.GetLength(0); i++)
+        {
+            for (int j = 0; j < a._dados.GetLength(1); j++)
+            {
+                resultado[i, j] = a[i, j] + b[i, j];
+            }
+        }
+        return resultado;
+    }
+    
+    public Matriz<T> Multiplicar(T escalar)
+    {
+        var resultado = new Matriz<T>(_dados.GetLength(0), _dados.GetLength(1));
+        for (int i = 0; i < _dados.GetLength(0); i++)
+        {
+            for (int j = 0; j < _dados.GetLength(1); j++)
+            {
+                resultado[i, j] = _dados[i, j] * escalar;
+            }
+        }
+        return resultado;
+    }
+}
+
+// Uso com diferentes tipos numéricos
+var matrizInt = new Matriz<int>(3, 3);
+var matrizDouble = new Matriz<double>(3, 3);
+var matrizDecimal = new Matriz<decimal>(3, 3);
+```
+
+**Interfaces Principais**:
+- `INumber<T>`: Operações aritméticas básicas (+, -, *, /)
+- `IFloatingPoint<T>`: Float/double específico (Sqrt, Sin, Cos)
+- `IBinaryInteger<T>`: Inteiros (bitwise, divisão inteira)
+- `IRootFunctions<T>`: Raízes (Sqrt, Cbrt)
+- `ITrigonometricFunctions<T>`: Trigonometria (Sin, Cos, Tan)
+
+### Interceptors (C# 12+)
+
+Interceptors são uma feature experimental que permite "interceptar" chamadas de métodos em compile-time.
+
+#### 1. Conceito e Casos de Uso
+
+```csharp
+// Feature experimental - requer <InterceptorsPreviewNamespaces> no .csproj
+// <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);MinhaApp.Interceptors</InterceptorsPreviewNamespaces>
+
+// Método original
+public class LogService
+{
+    public void Log(string mensagem)
+    {
+        Console.WriteLine($"[LOG] {mensagem}");
+    }
+}
+
+// Interceptor (gerado por Source Generator)
+namespace MinhaApp.Interceptors;
+
+public static class LogInterceptors
+{
+    [InterceptsLocation("Program.cs", line: 10, character: 5)]
+    public static void Log_Intercepted(this LogService service, string mensagem)
+    {
+        // Lógica adicional antes
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        
+        // Chama método original ou implementação customizada
+        Console.WriteLine($"[{timestamp}] {mensagem}");
+        
+        // Lógica adicional depois
+        MetricsCollector.IncrementLogCount();
+    }
+}
+```
+
+**Casos de uso**:
+- Instrumentação automática (logging, metrics)
+- Otimizações específicas (cache automático)
+- Transformação de APIs (compatibility layers)
+
+#### 2. Source Generator com Interceptors
+
+```csharp
+// Generator que cria interceptors para métodos marcados
+[Generator]
+public class LoggingInterceptorGenerator : IIncrementalGenerator
+{
+    public void Initialize(IncrementalGeneratorInitializationContext context)
+    {
+        var methodsToIntercept = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: (node, _) => node is InvocationExpressionSyntax,
+                transform: (ctx, _) => GetMethodToIntercept(ctx))
+            .Where(m => m != null);
+        
+        context.RegisterSourceOutput(methodsToIntercept, (spc, method) =>
+        {
+            var source = GenerateInterceptor(method!);
+            spc.AddSource($"{method!.Name}Interceptor.g.cs", source);
+        });
+    }
+    
+    private static MethodInfo? GetMethodToIntercept(GeneratorSyntaxContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+        
+        // Verifica se tem atributo [AutoLog]
+        var symbol = context.SemanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+        if (symbol?.GetAttributes().Any(a => a.AttributeClass?.Name == "AutoLogAttribute") == true)
+        {
+            return new MethodInfo(
+                symbol.ContainingType.Name,
+                symbol.Name,
+                invocation.GetLocation().GetLineSpan());
+        }
+        return null;
+    }
+}
+
+// Uso
+public class PedidoService
+{
+    [AutoLog] // Source generator cria interceptor
+    public async Task<Pedido> CriarPedidoAsync(CriarPedidoDto dto)
+    {
+        // Automaticamente logado: entrada, saída, exceções, tempo de execução
+        return await _repository.CriarAsync(dto);
+    }
+}
+```
+
+#### 3. Performance Monitoring Automático
+
+```csharp
+// Attribute para marcar métodos
+[AttributeUsage(AttributeTargets.Method)]
+public class MonitorPerformanceAttribute : Attribute { }
+
+// Interceptor gerado
+public static class PerformanceInterceptors
+{
+    [InterceptsLocation("PedidoService.cs", 42, 9)]
+    public static async Task<Pedido> CriarPedidoAsync_Monitored(
+        this PedidoService service,
+        CriarPedidoDto dto)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var resultado = await service.CriarPedidoAsync(dto);
+            stopwatch.Stop();
+            
+            Metrics.RecordDuration(
+                "pedido.criar",
+                stopwatch.ElapsedMilliseconds,
+                new { sucesso = true });
+            
+            return resultado;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            Metrics.RecordDuration(
+                "pedido.criar",
+                stopwatch.ElapsedMilliseconds,
+                new { sucesso = false, erro = ex.GetType().Name });
+            throw;
+        }
+    }
+}
+```
+
+#### 4. Limitações e Boas Práticas
+
+**Limitações**:
+- ❌ Feature experimental (pode mudar)
+- ❌ Requer conhecimento da localização exata (linha/coluna)
+- ❌ Não funciona com chamadas dinâmicas
+- ❌ Complexidade alta para casos simples
+
+**Quando usar**:
+- ✅ Frameworks e bibliotecas (ex: Entity Framework, ASP.NET)
+- ✅ Code generators avançados
+- ✅ Casos onde AOP tradicional não funciona bem
+
+**Alternativas mais simples**:
+- Decorators pattern
+- Middleware (ASP.NET)
+- Aspect-Oriented Programming libraries (PostSharp, etc.)
+
+### Async Streams e IAsyncEnumerable
+
+Processamento assíncrono de streams de dados, essencial para cenários de alta performance e baixa latência.
+
+#### 1. Conceitos Básicos de IAsyncEnumerable
+
+```csharp
+// Método que retorna stream assíncrono
+public async IAsyncEnumerable<Pedido> ObterPedidosStreamAsync(
+    [EnumeratorCancellation] CancellationToken cancellationToken = default)
+{
+    await foreach (var id in ObterIdsPedidosAsync(cancellationToken))
+    {
+        var pedido = await _repository.ObterPorIdAsync(id, cancellationToken);
+        if (pedido != null)
+            yield return pedido;
+    }
+}
+
+// Consumo do stream
+await foreach (var pedido in service.ObterPedidosStreamAsync())
+{
+    Console.WriteLine($"Processando pedido {pedido.Id}");
+    await ProcessarPedidoAsync(pedido);
+}
+```
+
+#### 2. Pagination Assíncrona
+
+```csharp
+public async IAsyncEnumerable<T> ObterTodosPaginadoAsync<T>(
+    Func<int, int, Task<IEnumerable<T>>> fetchPage,
+    int pageSize = 100,
+    [EnumeratorCancellation] CancellationToken ct = default)
+{
+    int page = 0;
+    while (true)
+    {
+        var items = await fetchPage(page, pageSize);
+        var itemsList = items.ToList();
+        
+        if (itemsList.Count == 0)
+            break;
+        
+        foreach (var item in itemsList)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return item;
+        }
+        
+        if (itemsList.Count < pageSize)
+            break;
+        
+        page++;
+    }
+}
+
+// Uso: processar milhões de registros sem carregar todos na memória
+await foreach (var usuario in ObterTodosPaginadoAsync(
+    (page, size) => _db.Usuarios.Skip(page * size).Take(size).ToListAsync(),
+    pageSize: 1000))
+{
+    await ProcessarUsuarioAsync(usuario);
+}
+```
+
+#### 3. Processamento em Tempo Real (Real-time Streaming)
+
+```csharp
+public async IAsyncEnumerable<Evento> MonitorarEventosAsync(
+    string topico,
+    [EnumeratorCancellation] CancellationToken ct = default)
+{
+    await using var consumer = CreateKafkaConsumer(topico);
+    
+    while (!ct.IsCancellationRequested)
+    {
+        var mensagem = await consumer.ConsumeAsync(ct);
+        if (mensagem != null)
+        {
+            var evento = DeserializarEvento(mensagem);
+            yield return evento;
+        }
+        
+        await Task.Delay(100, ct); // Polling interval
+    }
+}
+
+// Consumo com timeout e filtragem
+await foreach (var evento in MonitorarEventosAsync("pedidos")
+    .Where(e => e.Tipo == "PedidoCriado")
+    .WithCancellation(cts.Token))
+{
+    await NotificarSistemaExternoAsync(evento);
+}
+```
+
+#### 4. LINQ sobre IAsyncEnumerable
+
+```csharp
+// Extensões LINQ para async streams (System.Linq.Async)
+public async Task ProcessarPedidosAsync()
+{
+    var pedidosGrandes = ObterPedidosStreamAsync()
+        .Where(p => p.Total > 1000)
+        .OrderByDescending(p => p.Total)
+        .Take(100);
+    
+    await foreach (var pedido in pedidosGrandes)
+    {
+        await EnviarNotificacaoAsync(pedido);
+    }
+}
+
+// Agregações assíncronas
+var total = await ObterPedidosStreamAsync()
+    .Where(p => p.Status == "Aprovado")
+    .SumAsync(p => p.Total);
+
+var count = await ObterPedidosStreamAsync()
+    .CountAsync(p => p.DataCriacao > DateTime.Today);
+```
+
+#### 5. Channels + IAsyncEnumerable (Producer-Consumer)
+
+```csharp
+public class PedidoProcessor
+{
+    private readonly Channel<Pedido> _channel = Channel.CreateUnbounded<Pedido>();
+    
+    // Producer
+    public async Task ProduceAsync(IAsyncEnumerable<Pedido> pedidos)
+    {
+        await foreach (var pedido in pedidos)
+        {
+            await _channel.Writer.WriteAsync(pedido);
+        }
+        _channel.Writer.Complete();
+    }
+    
+    // Consumer como IAsyncEnumerable
+    public async IAsyncEnumerable<Pedido> ConsumeAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await foreach (var pedido in _channel.Reader.ReadAllAsync(ct))
+        {
+            yield return pedido;
+        }
+    }
+    
+    // Uso: pipeline de processamento
+    public async Task ExecutarPipelineAsync()
+    {
+        var pedidos = ObterPedidosStreamAsync();
+        
+        _ = Task.Run(() => ProduceAsync(pedidos)); // Producer em background
+        
+        // Múltiplos consumers
+        var tasks = Enumerable.Range(0, 4).Select(async i =>
+        {
+            await foreach (var pedido in ConsumeAsync())
+            {
+                await ProcessarPedidoAsync(pedido, i);
+            }
+        });
+        
+        await Task.WhenAll(tasks);
+    }
+}
+```
+
+#### 6. Error Handling e Cleanup
+
+```csharp
+public async IAsyncEnumerable<T> WithRetryAsync<T>(
+    IAsyncEnumerable<T> source,
+    int maxRetries = 3,
+    [EnumeratorCancellation] CancellationToken ct = default)
+{
+    var enumerator = source.GetAsyncEnumerator(ct);
+    try
+    {
+        while (true)
+        {
+            T item;
+            int retries = 0;
+            
+            while (true)
+            {
+                try
+                {
+                    if (!await enumerator.MoveNextAsync())
+                        yield break;
+                    
+                    item = enumerator.Current;
+                    break;
+                }
+                catch (Exception ex) when (retries < maxRetries)
+                {
+                    retries++;
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, retries)), ct);
+                }
+            }
+            
+            yield return item;
+        }
+    }
+    finally
+    {
+        await enumerator.DisposeAsync();
+    }
+}
+
+// Uso com logging e error handling
+await foreach (var pedido in ObterPedidosStreamAsync()
+    .WithRetryAsync(maxRetries: 3)
+    .WithCancellation(cts.Token))
+{
+    try
+    {
+        await ProcessarPedidoAsync(pedido);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Erro ao processar pedido {Id}", pedido.Id);
+        // Continua processando próximos itens
+    }
+}
+```
+
+**Quando usar IAsyncEnumerable**:
+- ✅ Processamento de grandes volumes (paginação, streaming)
+- ✅ APIs que retornam dados progressivamente
+- ✅ Integração com Kafka, RabbitMQ, SignalR
+- ✅ ETL e data pipelines
+- ❌ Coleções pequenas conhecidas (use Task<List<T>>)
+- ❌ Quando precisar de acesso aleatório aos dados
+
+### Span, Memory e Stack Allocation
+
+Tipos de alta performance para trabalhar com memória de forma eficiente, evitando alocações desnecessárias.
+
+#### 1. Span<T> Básico - Zero Allocations
+
+```csharp
+// Antes: aloca array novo
+public static int[] GetPrimeirosElementos(int[] array, int count)
+{
+    var resultado = new int[count];
+    Array.Copy(array, resultado, count);
+    return resultado; // Alocação heap!
+}
+
+// Depois: Span sem alocação
+public static Span<int> GetPrimeirosElementos(Span<int> array, int count)
+{
+    return array[..count]; // Slice - zero allocations!
+}
+
+// Uso
+int[] dados = [1, 2, 3, 4, 5];
+Span<int> primeiros = GetPrimeirosElementos(dados, 3);
+// primeiros[0] = 10; // Modifica array original!
+```
+
+#### 2. stackalloc para Arrays Temporários
+
+```csharp
+// Buffer temporário na stack (sem GC)
+public static void ProcessarDados(ReadOnlySpan<byte> input)
+{
+    // Aloca na stack até 1024 bytes
+    Span<byte> buffer = stackalloc byte[256];
+    
+    // Processamento sem alocação heap
+    for (int i = 0; i < input.Length && i < buffer.Length; i++)
+    {
+        buffer[i] = (byte)(input[i] ^ 0xFF); // XOR
+    }
+    
+    // buffer automaticamente limpo ao sair do escopo
+}
+
+// Collection expression com stackalloc (C# 12+)
+Span<int> numeros = stackalloc int[] { 1, 2, 3, 4, 5 };
+```
+
+#### 3. Memory<T> para Cenários Assíncronos
+
+```csharp
+// Span não funciona em async (stack-only)
+// Use Memory para async
+public async Task<int> ProcessarArquivoAsync(string path)
+{
+    using var stream = File.OpenRead(path);
+    
+    // Memory permite uso assíncrono
+    Memory<byte> buffer = new byte[4096];
+    
+    int totalBytes = 0;
+    int bytesRead;
+    while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
+    {
+        ProcessarChunk(buffer.Span[..bytesRead]);
+        totalBytes += bytesRead;
+    }
+    
+    return totalBytes;
+}
+
+private void ProcessarChunk(Span<byte> chunk)
+{
+    // Processamento em Span (pode ser stack ou heap)
+    for (int i = 0; i < chunk.Length; i++)
+    {
+        chunk[i] = (byte)(chunk[i] + 1);
+    }
+}
+```
+
+#### 4. String Parsing sem Alocações
+
+```csharp
+// Parsing de CSV ultra-rápido
+public static List<(string Nome, int Idade)> ParseCsvSpan(ReadOnlySpan<char> csv)
+{
+    var resultado = new List<(string, int)>();
+    
+    while (csv.Length > 0)
+    {
+        // Encontra quebra de linha
+        var lineEnd = csv.IndexOf('\n');
+        var line = lineEnd >= 0 ? csv[..lineEnd] : csv;
+        
+        // Encontra vírgula
+        var commaIndex = line.IndexOf(',');
+        if (commaIndex > 0)
+        {
+            var nome = line[..commaIndex].ToString(); // Única alocação
+            var idadeSpan = line[(commaIndex + 1)..];
+            
+            if (int.TryParse(idadeSpan, out var idade))
+            {
+                resultado.Add((nome, idade));
+            }
+        }
+        
+        // Próxima linha
+        csv = lineEnd >= 0 ? csv[(lineEnd + 1)..] : [];
+    }
+    
+    return resultado;
+}
+
+// Uso
+string csvData = "Ana,30\nBeto,25\nCarlos,40";
+var pessoas = ParseCsvSpan(csvData.AsSpan());
+```
+
+#### 5. Operações de Array High-Performance
+
+```csharp
+public static class SpanExtensions
+{
+    // Reverse sem alocação
+    public static void ReverseInPlace<T>(this Span<T> span)
+    {
+        for (int i = 0; i < span.Length / 2; i++)
+        {
+            (span[i], span[^(i + 1)]) = (span[^(i + 1)], span[i]);
+        }
+    }
+    
+    // Contains otimizado
+    public static bool Contains<T>(this ReadOnlySpan<T> span, T value) 
+        where T : IEquatable<T>
+    {
+        return span.IndexOf(value) >= 0;
+    }
+    
+    // Fill pattern
+    public static void FillPattern<T>(this Span<T> span, ReadOnlySpan<T> pattern)
+    {
+        for (int i = 0; i < span.Length; i++)
+        {
+            span[i] = pattern[i % pattern.Length];
+        }
+    }
+}
+
+// Uso
+int[] array = [1, 2, 3, 4, 5];
+Span<int> span = array;
+span.ReverseInPlace(); // [5, 4, 3, 2, 1] - in-place!
+
+Span<char> buffer = stackalloc char[20];
+buffer.FillPattern("AB".AsSpan()); // "ABABABABABABABABABA"
+```
+
+#### 6. Slicing e Manipulação Eficiente
+
+```csharp
+public static class StringSpanExtensions
+{
+    // Split sem alocações intermediárias
+    public static void SplitForEach(
+        this ReadOnlySpan<char> text,
+        char separator,
+        Action<ReadOnlySpan<char>> action)
+    {
+        while (text.Length > 0)
+        {
+            var index = text.IndexOf(separator);
+            if (index < 0)
+            {
+                action(text);
+                break;
+            }
+            
+            action(text[..index]);
+            text = text[(index + 1)..];
+        }
+    }
+}
+
+// Uso: processar path sem criar array de strings
+"/home/user/documents/file.txt".AsSpan().SplitForEach('/', segment =>
+{
+    Console.WriteLine(segment.ToString());
+});
+
+// Benchmark comparativo:
+// string.Split: ~500ns, 240 bytes alocados
+// SplitForEach: ~120ns, 0 bytes alocados
+```
+
+#### 7. Regex com Span (C# 13+)
+
+```csharp
+// Regex moderno suporta Span
+var regex = new Regex(@"\d+");
+
+ReadOnlySpan<char> text = "Pedido 123 no valor de 456 reais";
+
+// Enumera matches sem alocações
+foreach (var match in regex.EnumerateMatches(text))
+{
+    var numero = text.Slice(match.Index, match.Length);
+    Console.WriteLine(int.Parse(numero)); // 123, 456
+}
+```
+
+**Performance Guidelines**:
+- Use `Span<T>` para código síncrono e alta performance
+- Use `Memory<T>` para código assíncrono
+- Use `stackalloc` para buffers temporários pequenos (<1KB)
+- Para buffers grandes ou dinâmicos, use `ArrayPool<T>.Shared.Rent()`
+- Sempre use `ReadOnlySpan<T>` quando não precisar modificar dados
+
+**Benchmarks típicos**:
+- Span vs. Array: 50-90% menos alocações
+- stackalloc vs. new: ~10x mais rápido para arrays pequenos
+- String.Substring vs. Span.Slice: ~5x mais rápido, zero allocations
 
 ---
 
