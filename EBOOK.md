@@ -1028,6 +1028,291 @@ O .NET evoluiu de uma plataforma Windows-only para o ecossistema moderno mais co
 
 ## Capítulo 2: Guia de Migração de .NET 4.5
 
+A migração de .NET Framework 4.5 para .NET 10 é uma jornada técnica que requer planejamento cuidadoso, análise de dependências e execução estruturada. Este capítulo fornece um guia passo a passo completo, desde a avaliação inicial até a validação final em produção.
+
+---
+
+### 2.1. Avaliação Detalhada do Projeto
+
+Antes de iniciar qualquer migração, é essencial fazer uma auditoria completa do código e das dependências existentes. Esta seção fornece um checklist detalhado e ferramentas para análise.
+
+#### 2.1.1. Checklist de Avaliação Inicial
+
+**Análise de Arquitetura e Tecnologias**
+
+| Categoria | Perguntas de Avaliação | Ação Recomendada |
+|-----------|------------------------|------------------|
+| **UI/Frontend** | Usa WebForms com ViewState/Postback? | → Migrar para **Blazor Server** (mínimas mudanças) ou **Blazor WebAssembly** (SPA moderno) |
+| | Usa ASP.NET MVC 4/5 clássico? | → Migrar para **ASP.NET Core MVC** ou **Razor Pages** (minimal APIs para APIs simples) |
+| | Usa WinForms ou WPF? | → **Manter** (suportado no .NET 10 Windows) ou migrar para **MAUI** (cross-platform) |
+| **Comunicação** | Usa WCF (SOAP, NetTcp)? | → Migrar para **gRPC** (type-safe, 5-10x mais rápido) ou **REST APIs** |
+| | Usa .NET Remoting? | → Migrar para **gRPC** ou **SignalR** (real-time) |
+| | Usa MSMQ? | → Migrar para **RabbitMQ**, **Azure Service Bus** ou **Kafka** |
+| **Dados** | Usa Entity Framework 5/6? | → Migrar para **EF Core 8** (melhor performance, cross-platform) |
+| | Usa ADO.NET com DataTable/DataSet? | → Refatorar para **Dapper** (micro-ORM) ou **EF Core** |
+| | Usa TransactionScope distribuídas? | → Substituir por **Saga pattern** ou transações locais |
+| **Serialização** | Usa BinaryFormatter? | → Migrar para **System.Text.Json** (seguro, rápido) ou **Protobuf** |
+| | Usa Newtonsoft.Json? | → Substituir por **System.Text.Json** (2-3x mais rápido) |
+| **Infraestrutura** | Roda apenas no IIS? | → Migrar para **Kestrel** (cross-platform, 10x mais rápido) |
+| | Usa AppDomains para isolamento? | → Substituir por **processos separados** ou **containers** |
+| | Usa Code Access Security (CAS)? | → Remover (descontinuado), usar **sandboxing em containers** |
+
+#### 2.1.2. Script de Diagnóstico Automatizado
+
+Use este script PowerShell para analisar seu projeto e identificar dependências problemáticas:
+
+```powershell
+# Ferramenta de Análise de Migração .NET Framework → .NET 10
+# Salve como: Analyze-NetFrameworkProject.ps1
+
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$ProjectPath
+)
+
+Write-Host "🔍 Analisando projeto .NET Framework em: $ProjectPath" -ForegroundColor Cyan
+
+# 1. Detectar tecnologias descontinuadas no código-fonte
+$problematicPatterns = @{
+    "WebForms" = @("System.Web.UI", "ViewState", "IsPostBack", "Page_Load")
+    "WCF" = @("System.ServiceModel", "[ServiceContract]", "[OperationContract]")
+    "Remoting" = @("System.Runtime.Remoting", "MarshalByRefObject")
+    "BinaryFormatter" = @("BinaryFormatter", "ISerializable")
+    "AppDomains" = @("AppDomain.CreateDomain", "AppDomain.Load")
+    "DataSet/DataTable" = @("DataSet", "DataTable", "DataRow")
+}
+
+$findings = @{}
+
+Get-ChildItem -Path $ProjectPath -Include *.cs,*.vb -Recurse | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    
+    foreach ($tech in $problematicPatterns.Keys) {
+        foreach ($pattern in $problematicPatterns[$tech]) {
+            if ($content -match [regex]::Escape($pattern)) {
+                if (-not $findings.ContainsKey($tech)) {
+                    $findings[$tech] = @()
+                }
+                $findings[$tech] += $_.FullName
+            }
+        }
+    }
+}
+
+# 2. Analisar pacotes NuGet
+Write-Host "`n📦 Analisando pacotes NuGet..." -ForegroundColor Yellow
+
+$packagesConfig = Get-ChildItem -Path $ProjectPath -Filter packages.config -Recurse
+if ($packagesConfig) {
+    [xml]$packages = Get-Content $packagesConfig[0].FullName
+    
+    $incompatiblePackages = @(
+        "EntityFramework", # Versão 6.x precisa migrar para EF Core
+        "Newtonsoft.Json", # Substituir por System.Text.Json
+        "log4net",         # Considerar migrar para Microsoft.Extensions.Logging
+        "Autofac",         # Usar Microsoft.Extensions.DependencyInjection nativo
+        "System.Web.Mvc"   # Migrar para ASP.NET Core MVC
+    )
+    
+    Write-Host "`nPacotes que precisam atenção:"
+    foreach ($package in $packages.packages.package) {
+        if ($incompatiblePackages -contains $package.id) {
+            Write-Host "  ⚠️  $($package.id) v$($package.version)" -ForegroundColor Red
+        }
+    }
+}
+
+# 3. Gerar relatório
+Write-Host "`n📊 RELATÓRIO DE MIGRAÇÃO" -ForegroundColor Green
+Write-Host "=" * 60
+
+if ($findings.Count -eq 0) {
+    Write-Host "✅ Nenhuma tecnologia descontinuada crítica detectada!" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  Tecnologias que requerem atenção:`n" -ForegroundColor Yellow
+    
+    foreach ($tech in $findings.Keys) {
+        Write-Host "  🔴 $tech detectado em $($findings[$tech].Count) arquivos" -ForegroundColor Red
+        $findings[$tech] | Select-Object -First 3 | ForEach-Object {
+            Write-Host "     - $_"
+        }
+        if ($findings[$tech].Count -gt 3) {
+            Write-Host "     ... e mais $($findings[$tech].Count - 3) arquivos"
+        }
+        Write-Host ""
+    }
+}
+
+# 4. Estimar esforço
+$complexityScore = 0
+$complexityScore += if ($findings["WebForms"]) { 8 } else { 0 }
+$complexityScore += if ($findings["WCF"]) { 6 } else { 0 }
+$complexityScore += if ($findings["Remoting"]) { 5 } else { 0 }
+$complexityScore += if ($findings["BinaryFormatter"]) { 3 } else { 0 }
+$complexityScore += if ($findings["AppDomains"]) { 4 } else { 0 }
+
+Write-Host "🎯 ESTIMATIVA DE ESFORÇO" -ForegroundColor Cyan
+if ($complexityScore -eq 0) {
+    Write-Host "   Baixo (1-2 semanas): Projeto simples, poucas dependências problemáticas" -ForegroundColor Green
+} elseif ($complexityScore -le 10) {
+    Write-Host "   Médio (1-2 meses): Algumas tecnologias descontinuadas, mas migração direta" -ForegroundColor Yellow
+} else {
+    Write-Host "   Alto (3-6 meses): Múltiplas tecnologias legadas, requer refatoração significativa" -ForegroundColor Red
+}
+
+Write-Host "`n💡 PRÓXIMOS PASSOS RECOMENDADOS:" -ForegroundColor Magenta
+Write-Host "   1. Executar: dotnet upgrade-assistant analyze $ProjectPath"
+Write-Host "   2. Criar branch de migração: git checkout -b feature/migrate-to-net10"
+Write-Host "   3. Seguir este guia: Capítulo 2, seções 2.2 a 2.6"
+Write-Host "=" * 60
+```
+
+**Como usar o script:**
+
+```powershell
+# Executar análise
+.\Analyze-NetFrameworkProject.ps1 -ProjectPath "C:\MeuProjeto\src"
+
+# Exemplo de saída esperada:
+# 🔍 Analisando projeto .NET Framework em: C:\MeuProjeto\src
+# 
+# 📦 Analisando pacotes NuGet...
+# Pacotes que precisam atenção:
+#   ⚠️  EntityFramework v6.4.4
+#   ⚠️  Newtonsoft.Json v12.0.3
+#
+# 📊 RELATÓRIO DE MIGRAÇÃO
+# ============================================================
+# ⚠️  Tecnologias que requerem atenção:
+#
+#   🔴 WCF detectado em 12 arquivos
+#      - Services\OrderService.cs
+#      - Services\CustomerService.cs
+#      ... e mais 10 arquivos
+#
+# 🎯 ESTIMATIVA DE ESFORÇO
+#    Médio (1-2 meses): Algumas tecnologias descontinuadas, mas migração direta
+```
+
+#### 2.1.3. Análise de Dependências com .NET Upgrade Assistant
+
+A Microsoft oferece uma ferramenta oficial que automatiza parte da análise:
+
+```bash
+# Instalar ferramenta oficial
+dotnet tool install -g upgrade-assistant
+
+# Analisar projeto (gera relatório sem fazer mudanças)
+upgrade-assistant analyze .\MeuProjeto.csproj
+
+# Exemplo de saída:
+# ┌──────────────────────────────────────────────────────────────┐
+# │ Upgrade Assistant Analysis Report                            │
+# ├──────────────────────────────────────────────────────────────┤
+# │ Project: MeuProjeto.csproj                                   │
+# │ Target Framework: net48 → Recommended: net10.0               │
+# │                                                              │
+# │ Breaking Changes Detected:                                   │
+# │   • BinaryFormatter usage (Security risk)                    │
+# │   • System.Web.Mvc references (Not compatible)               │
+# │   • Entity Framework 6.x (Use EF Core 8)                     │
+# │                                                              │
+# │ Effort Estimate: Medium (40-60 hours)                        │
+# └──────────────────────────────────────────────────────────────┘
+```
+
+#### 2.1.4. Checklist de Compatibilidade de Bibliotecas
+
+Verifique se suas bibliotecas de terceiros têm versões compatíveis com .NET 10:
+
+**Bibliotecas Comuns e Status de Migração:**
+
+| Biblioteca .NET 4.5 | Versão Compatível .NET 10 | Notas |
+|---------------------|---------------------------|-------|
+| **EntityFramework 6.x** | → **EF Core 8.0** | Breaking changes significativas, mas migration path claro |
+| **Newtonsoft.Json** | → **System.Text.Json** (nativo) | 2-3x mais rápido, mas algumas features faltam (use Newtonsoft 13+ se necessário) |
+| **log4net** | → **Microsoft.Extensions.Logging** | Padrão moderno, integrado com ASP.NET Core |
+| **Autofac** | → **Microsoft.Extensions.DI** (nativo) | DI container nativo é suficiente para 90% dos casos |
+| **NUnit 2.x** | → **NUnit 3.14+** ou **xUnit 2.6+** | Ambos totalmente compatíveis |
+| **Moq 4.x** | → **Moq 4.20+** | Compatível, sem mudanças |
+| **AutoMapper** | → **AutoMapper 12+** | Totalmente compatível |
+| **FluentValidation** | → **FluentValidation 11+** | Sem breaking changes |
+| **Hangfire** | → **Hangfire 1.8+** | Suporta .NET 10 |
+| **Serilog** | → **Serilog 3.1+** | Totalmente compatível |
+
+**Como verificar compatibilidade:**
+
+```bash
+# Usar ferramenta da comunidade para checar pacotes NuGet
+dotnet list package --outdated --include-transitive
+
+# Buscar versões compatíveis no NuGet.org
+# Filtrar por "Frameworks: .NET 8.0, .NET 9.0, .NET 10.0"
+```
+
+#### 2.1.5. Identificação de Código Platform-Specific (Windows-only)
+
+Código que depende de APIs específicas do Windows pode causar problemas ao rodar em Linux/macOS:
+
+**APIs Windows-only Comuns:**
+
+```csharp
+// ❌ .NET 4.5 - Windows-only
+using System.DirectoryServices; // Active Directory (não funciona em Linux)
+using Microsoft.Win32;           // Windows Registry
+
+// Exemplos de código problemático:
+var searcher = new DirectorySearcher("LDAP://...");  // Active Directory
+var regKey = Registry.LocalMachine.OpenSubKey("Software\\..."); // Registry
+var identity = WindowsIdentity.GetCurrent(); // Windows Authentication
+```
+
+**Alternativas Cross-Platform:**
+
+```csharp
+// ✅ .NET 10 - Cross-platform
+using System.DirectoryServices.Protocols; // LDAP cross-platform
+
+// Active Directory via LDAP padrão
+var connection = new LdapConnection("ldap.empresa.com");
+connection.Bind(new NetworkCredential("user", "pass"));
+
+// Configuração via appsettings.json (não Registry)
+var config = builder.Configuration.GetSection("MySettings").Get<MySettings>();
+
+// Autenticação via JWT/OAuth (não Windows Authentication)
+services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => { /* ... */ });
+```
+
+#### 2.1.6. Matriz de Decisão: Migrar, Reescrever ou Manter
+
+Use esta matriz para decidir a melhor estratégia por módulo:
+
+| Critério | Migrar (Refactor) | Reescrever (Rewrite) | Manter em .NET 4.8 |
+|----------|-------------------|----------------------|-------------------|
+| **Tamanho do código** | < 50k linhas | Qualquer | < 10k linhas, isolado |
+| **Qualidade do código** | Boa estrutura, testes | Código legado, sem testes | Código que "não pode quebrar" |
+| **Dependências** | Poucas bibliotecas descontinuadas | Muitas dependências mortas | Nenhuma necessidade de .NET 10 |
+| **Criticidade** | Baixa/média | Baixa (pode testar extensivamente) | Alta (não pode parar) |
+| **Esforço estimado** | 2-8 semanas | 2-6 meses | N/A |
+| **Exemplo** | API REST com EF6 | WebForms complexo com ViewState | Ferramenta interna Windows-only |
+
+**Decisão Estratégica:**
+
+```plaintext
+┌─────────────────────────────────────────────────────────────┐
+│ REGRA DE OURO: Use Strangler Pattern                       │
+│                                                             │
+│ • Migre serviços críticos primeiro (APIs, backend)          │
+│ • Mantenha UIs legadas funcionando via HTTP bridges        │
+│ • Reescreva apenas código impossível de migrar             │
+│ • Evite "Big Bang" rewrites (alto risco de falha)          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### Passos práticos:
 
 #### 1. Avalie seu projeto:
